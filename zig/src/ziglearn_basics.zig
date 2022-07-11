@@ -3,6 +3,32 @@ const expect = std.testing.expect;
 
 pub fn main() void {
     {
+
+    }
+    {
+        // TODO: find out const[5]u8 and []u8 "hello"
+        std.log.info("type: {}", .{@TypeOf("hello")}); // *const[5:0]u8
+    }
+    {
+
+        // error: cannot get b[3]
+        // var b = [_]u8{3,2,1};
+        // std.log.info("type of b: {s}, len of b: {}, value of b: {d}, 4th: {d}", .{
+        //     @typeName(@TypeOf(b)), b.len, b, b[3],
+        // });
+
+        // extra b[4], which is termination
+        var a: [3:0]u8 = .{3,2,1};
+        std.log.info("type of a: {s}, len of a: {}, value of a: {d}, 4th: {d}", .{
+            @typeName(@TypeOf(a)), a.len, a, a[3],
+        });
+
+        // const b: [*]u8 = a;
+        // std.log.info("type of b: {s}, value of b: {s}", .{
+        //     @typeName(@TypeOf(b)), b,
+        // });
+    }
+    {
         var data = [_]u8{1, 2, 3};
 
         // value capture
@@ -1258,6 +1284,10 @@ test "sentinel termination" {
 
 test "string literal" {
     try expect(@TypeOf("hello") == *const [5:0]u8);
+}
+
+test "C string" {
+    try expect(@TypeOf("hello") == *const[5:0]u8);
 }
 
 test "sentinel termination coersion" {
