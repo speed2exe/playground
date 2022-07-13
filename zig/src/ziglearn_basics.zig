@@ -3,6 +3,37 @@ const expect = std.testing.expect;
 
 pub fn main() void {
     {
+        var a = "hello";
+        std.log.info("type of a: {s}, value of a: {s}", .{
+            @typeName(@TypeOf(a)), a,
+        });
+
+        var a_def = a.*;
+        std.log.info("type of a_def: {s}, value of a_def: {s}", .{
+            @typeName(@TypeOf(a_def)), a_def,
+        });
+
+        var b = a[0..1];
+        std.log.info("type of b: {s}, value of b: {s}", .{
+            @typeName(@TypeOf(b)), b,
+        });
+
+        var c: []const u8 = a[0..1];
+        std.log.info("type of c: {s}, value of c: {s}", .{
+            @typeName(@TypeOf(c)), c,
+        });
+
+        var d: [*]const u8 = a;
+        std.log.info("type of d: {s}, value of d: {*}", .{
+            @typeName(@TypeOf(d)), d,
+        });
+
+        // Cannot deref_ c
+        // var c_def = c.*;
+        // std.log.info("type of c_def: {s}, value of c_def: {s}", .{
+        //     @typeName(@TypeOf(c_def)), c_def,
+        // });
+
 
     }
     {
