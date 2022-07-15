@@ -24,9 +24,9 @@ pub fn main() void {
         b();
     }
 
-    // create fn and call in on the fly
-    struct {fn f() void {
-        std.log.info("create and call", .{});
+    // create fn and call it on the fly
+    defer struct {fn f() void {
+        std.log.info("deferred create and call", .{});
     }}.f();
 
     // as tuple
