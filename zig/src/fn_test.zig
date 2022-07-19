@@ -35,7 +35,8 @@ pub fn main() void {
             std.log.info("create and call", .{});
         }}._();
     }
-    
+ 
+    // unable to do
     //var c: fn() void = .{fn customFunc() void {
         //std.log.info("in custom func", .{}),
     //}};
@@ -46,6 +47,36 @@ pub fn main() void {
     takeInFunc(struct {fn _() void {
         std.log.info("tooked in this anon func", .{});
     }}._);
+
+    {
+        var oneTimeStruct = .{
+            .a = @as(u32, 1324),
+            .b = struct {fn _() void {
+                std.log.info("calling b in one time struct {}", .{.a = .a});
+            }}._,
+            .c = sayHi,
+        };
+        std.log.info("one time struct {}", .{oneTimeStruct});
+        oneTimeStruct.b();
+        oneTimeStruct.c();
+    }
+
+    // defer a whole block of instructions
+    defer {
+        std.log.info("hi there! deferred 1", .{});
+        std.log.info("hi there! deferred 2", .{});
+        std.log.info("hi there! deferred 3", .{});
+    }
+    {
+        // TODO: implement one time struct with field and methods
+        var s = struct {
+            // fill me!!!
+        };
+    }
+    {
+
+
+    }
 }
 
 fn takeInFunc(f: fn() void) void {
