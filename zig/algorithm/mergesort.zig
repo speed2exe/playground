@@ -1,7 +1,6 @@
 const std = @import("std");
 
 pub fn main() !void {
-
     // 1 to 100 random order
     const data = [_]u8{ 86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17, 12, 77, 46, 49, 82, 58, 26,
         89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22, 85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
@@ -29,15 +28,16 @@ pub fn mergeSort (
 
     // initialize a new array for computation
     // require a total space of 2 * size of data
-    var full = try allocator.alloc(T, data.len * 2);
-    var src = full[0..data.len];
-    var dest = full[data.len..];
+    var src = try allocator.alloc(T, data.len);
+    var dest = try allocator.alloc(T, data.len);
     std.mem.copy(T, src, data);
 
     if (mergeSortWithOutput(T, src, dest, less)) {
-        return full;
+        allocator.free(dest);
+        return src;
     } else {
-        return full;
+        allocator.free(src);
+        return dest;
     }
 }
 
