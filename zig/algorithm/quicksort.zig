@@ -1,16 +1,31 @@
 // create sort algorithm for generic types
 // quick and merge
-const std = @import("std");
-const print = std.debug.print;
 
-pub fn main() void {
+const std = @import("std");
+const testing = std.testing;
+// const print = std.debug.print;
+
+test "quickSort u8" {
     var array = [_]u8{3,2,5,9,7,6,4, 10, 99, 77, 88,55, 44, 22, 33};
     quickSort(u8, &array, u8Less);
-    print("sorted data: {d}\n", .{array});
 
+    var expected = [_]u8 { 2, 3, 4, 5, 6, 7, 9, 10, 22, 33, 44, 55, 77, 88, 99 };
+    try testing.expectEqualSlices(u8,
+        &expected,
+        &array,
+    );
+}
+
+test "quickSort string" {
     var string_array = [_][]const u8{"z", "b", "ac", "ab", "bc", "ba", "a"};
     quickSort([]const u8, &string_array, stringLessThan);
-    print("sorted string_array: {s}", .{string_array});
+
+    std.log.warn("{s}",.{string_array});
+    var expected = [_][]const u8{ "a", "b", "z", "ab", "ac", "ba", "bc" };
+    try testing.expectEqualSlices([]const u8,
+        &expected,
+        &string_array,
+    );
 }
 
 fn u8Less(a: u8, b: u8) bool {
@@ -19,14 +34,12 @@ fn u8Less(a: u8, b: u8) bool {
 
 // custom string sorting rules
 fn stringLessThan(a: []const u8, b: []const u8) bool {
-
     if (a.len < b.len) {
         return true;
     }
     if (a.len > b.len) {
         return false;
     }
-
     for (a) |a_val, i| {
         const b_val = b[i];
         if (a_val < b_val) {
@@ -37,13 +50,12 @@ fn stringLessThan(a: []const u8, b: []const u8) bool {
             return false;
         }
     }
-
     return false;
 }
 
 // quickSort sorts the data inplace
 // quickSort is basically recursive partitioning
-fn quickSort (
+pub fn quickSort (
     comptime T: type,
     data: []T, // array to be sorted
     less: fn(a: T, b: T) bool,
