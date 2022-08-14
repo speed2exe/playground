@@ -1,16 +1,14 @@
 # To Learn:
 - allocate dynamic amount of mem into stack
-
-- noreturn type
-
-- pass in fn as parameter
-- anonymouse fn
 - call other vars and fn from another file/package
-- use a package manager
-
-- allocate 
-- assert fn that retuns specific error
 - handle different types at compile time
+- AOC
+- SQL Parser Completer
+
+# wait for new version
+- use a package manager
+- multiple return values
+- errors with value
 
 # DONE
 - how to ignore error using catch
