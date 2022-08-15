@@ -1,6 +1,5 @@
 # To Learn:
 - allocate dynamic amount of mem into stack
-- call other vars and fn from another file/package
 - handle different types at compile time
 - AOC
 - SQL Parser Completer

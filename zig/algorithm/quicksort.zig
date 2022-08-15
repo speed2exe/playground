@@ -6,6 +6,7 @@ const testing = std.testing;
 // const print = std.debug.print;
 
 test "quickSort u8" {
+    std.Thread
     var array = [_]u8{3,2,5,9,7,6,4, 10, 99, 77, 88,55, 44, 22, 33};
     quickSort(u8, &array, u8Less);
 
