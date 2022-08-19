@@ -11,16 +11,15 @@ pub fn main() !void {
             std.log.err("got leaked!",.{});
         }
     }
-    // // 1 to 100 random order
-    const data = [_]u8 {
-        5,4,3,2
 
-        // 86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
-        // 12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
-        // 85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
-        // 68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
-        // 32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
-        // 100, 41, 95, 73, 38, 30, 61, 59, 43, 5
+    // 1 to 100 random order
+    const data = [_]u8 {
+        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
+        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
+        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
+        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
+        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
+        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
     };
 
     // initialised a fib. heap
@@ -50,7 +49,7 @@ pub fn main() !void {
     // _ = try fib_heap.peekStaging();
     while (fib_heap.pop() catch unreachable) |value| {
         std.debug.print("popped: {d}\n", .{value});
-        return;
+        // return;
     }
 }
 
@@ -109,7 +108,6 @@ pub fn FibonacciHeap(comptime T: type) type {
         // Key must still be valid for the whole lifetime of this structure
         // if the key type is not primitive
         pub fn insert(self: *Self, key: T) !void {
-            print("insert: append called\n", .{});
             try self.unbucketed_roots.append(FibonacciNode(T).init(self.allocator, key));
         }
 
@@ -251,7 +249,6 @@ fn FibonacciNode(comptime T: type) type {
         }
 
         fn add_child(self: *Self, child: FibonacciNode(T)) !void {
-            print("add_child: append called\n",.{});
             try self.children.append(child);
         }
     };
