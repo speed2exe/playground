@@ -41,16 +41,15 @@ pub fn main() !void {
 
     // const pek = fib_heap.peekStaging();
     // std.debug.print("{any}",.{pek});
-    try fib_heap.stageIndex();
+    // try fib_heap.stageIndex();
 
-    // var count: usize = 8;
-    // while (fib_heap.pop() catch unreachable) |value| {
-    //     count -= 1;
-    //     std.debug.print("popped: {d}\n", .{value});
-    //     if (count == 0) {
-    //         return;
-    //     }
-    // }
+    // var count: usize = 1;
+
+    // _ = try fib_heap.peekStaging();
+    while (fib_heap.pop() catch unreachable) |value| {
+        std.debug.print("popped: {d}\n", .{value});
+        return;
+    }
 }
 
 fn u8Less(a: u8, b: u8) bool {
@@ -99,8 +98,9 @@ pub fn FibonacciHeap(comptime T: type) type {
         }
 
         // Return key of the highest Priority
-        pub fn peek(self: Self) ?T {
-           const node = self.peekStaging() orelse null;
+        pub fn peek(self: *Self) !?T {
+           const node_opt = try self.peekStaging();
+           const node = node_opt orelse return null;
            return node.key;
         }
 
@@ -115,6 +115,7 @@ pub fn FibonacciHeap(comptime T: type) type {
             var node = node1 orelse return null;
             self.staging_index = null;
             try self.unbucketed_roots.appendSlice(node.children.items);
+            node.children.clearRetainingCapacity();
             return node.key;
         }
 
@@ -229,9 +230,9 @@ fn FibonacciNode(comptime T: type) type {
         }
 
         fn deinit(self: *Self) void {
-            var children = self.children.items;
-            for (children) |*child| {
-                child.deinit();
+            print("node deinit len: {d}\n", .{self.children.items.len});
+            for (self.children.items) |*child_ptr| {
+                child_ptr.deinit();
             }
             self.children.deinit();
         }
@@ -245,3 +246,4 @@ fn FibonacciNode(comptime T: type) type {
         }
     };
 }
+
