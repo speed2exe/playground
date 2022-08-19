@@ -13,12 +13,14 @@ pub fn main() !void {
     }
     // // 1 to 100 random order
     const data = [_]u8 {
-        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
-        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
-        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
-        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
-        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
-        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
+        5,4,3,2
+
+        // 86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
+        // 12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
+        // 85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
+        // 68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
+        // 32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
+        // 100, 41, 95, 73, 38, 30, 61, 59, 43, 5
     };
 
     // initialised a fib. heap
@@ -111,10 +113,15 @@ pub fn FibonacciHeap(comptime T: type) type {
         }
 
         pub fn pop(self: *Self) !?T {
-            var node1 = try self.peekStaging();
-            var node = node1 orelse return null;
-            self.staging_index = null;
-            try self.unbucketed_roots.appendSlice(node.children.items);
+            try self.stageIndexIfNull();
+            const staging_index = self.staging_index orelse return null;
+            var node = self.bucketed_roots.items[staging_index] orelse unreachable;
+            defer { // invalidate staging
+                self.bucketed_roots.items[staging_index] = null;
+                self.staging_index = null;
+            }
+            var orphans = node.children.toOwnedSlice();
+            try self.unbucketed_roots.appendSlice(orphans);
             node.children.clearRetainingCapacity();
             return node.key;
         }
@@ -134,10 +141,10 @@ pub fn FibonacciHeap(comptime T: type) type {
         // assigns index of node with lowest value
         fn stageIndex(self: *Self) !void {
             // insert all nodes from unbucketed_roots to bucketed_roots
+            defer self.unbucketed_roots.clearRetainingCapacity();
             for (self.unbucketed_roots.items) |*root| {
                 try self.insertNodeToBucketed(root);
             }
-            self.unbucketed_roots.clearRetainingCapacity();
 
             // select 1st elem, do nothing if unable to be found
             var min_index: usize = undefined;
@@ -230,8 +237,10 @@ fn FibonacciNode(comptime T: type) type {
         }
 
         fn deinit(self: *Self) void {
-            print("node deinit len: {d}\n", .{self.children.items.len});
-            for (self.children.items) |*child_ptr| {
+            //print("node deinit len: {d}\n", .{self.children.items.len});
+            var items = self.children.items;
+            // for (self.children.items) |*child_ptr| {
+            for (items) |*child_ptr| {
                 child_ptr.deinit();
             }
             self.children.deinit();
