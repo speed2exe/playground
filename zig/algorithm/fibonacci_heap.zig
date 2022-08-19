@@ -1,6 +1,8 @@
 const std = @import("std");
 const print = std.debug.print;
 const ArrayList = std.ArrayList;
+const test_allocator = std.testing.allocator;
+const expectEqual = std.testing.expectEqual;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -50,6 +52,59 @@ pub fn main() !void {
     while (fib_heap.pop() catch unreachable) |value| {
         std.debug.print("popped: {d}\n", .{value});
         // return;
+    }
+}
+
+test "FibonacciHeap 100 random u8" {
+    const data = [_]u8 {
+        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
+        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
+        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
+        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
+        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
+        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
+    };
+
+    // initialize the data structure
+    var fib_heap = FibonacciHeap(u8).init(test_allocator, u8Less);
+    // clean up at the end of function
+    defer fib_heap.deinit();
+    // insert all data into it
+    for (data) |value| {
+        try fib_heap.insert(value);
+    }
+    // check the correctness of output (should be from 1 to 100)
+    var expected: u8 = 1;
+    while (fib_heap.pop() catch unreachable) |value| : (expected += 1) {
+        try std.testing.expectEqual(expected, value);
+    }
+}
+
+test "FibonacciHeap 100 random u8" {
+    var fib_heap = FibonacciHeap(u8).init(test_allocator, u8Less);
+    defer fib_heap.deinit();
+    try fib_heap.insert(7);
+    try fib_heap.insert(5);
+    try fib_heap.insert(3);
+
+    {
+        const popped = fib_heap.pop() catch unreachable orelse unreachable;
+        const expected: u8 = 3;
+        try expectEqual(expected, popped);
+    }
+
+    {
+        const expected: u8 = 5;
+        const peeked = fib_heap.peek() catch unreachable orelse unreachable;
+        try expectEqual(expected, peeked);
+        const popped = fib_heap.pop() catch unreachable orelse unreachable;
+        try expectEqual(expected, popped);
+    }
+    {
+        try fib_heap.insert(1);
+        const expected: u8 = 1;
+        const popped = fib_heap.peek() catch unreachable orelse unreachable;
+        try expectEqual(expected, popped);
     }
 }
 
@@ -177,16 +232,16 @@ pub fn FibonacciHeap(comptime T: type) type {
             // supposed to fit degree 0 in index 0, degree 1 in index 1 ...
             // worse case is when if max degree node of bucketed_roots same as incoming
             // node, we need to accommodate for merging
+            // laziest way is just to add 1 to the end of array,
+            // and pop it out if it's still empty
             try self.bucketed_roots.appendNTimes(null, 1);
-            defer {
-                var last_node = self.bucketed_roots.pop();
-                if (last_node) |_| {
-                    self.bucketed_roots.appendAssumeCapacity(last_node);
-                }
+            defer blk: {
+                var last_node = self.bucketed_roots.pop() orelse break :blk;
+                self.bucketed_roots.appendAssumeCapacity(last_node);
                 // print("inserted at {d} degree\n",.{degree});
             }
 
-            while (true) { defer { degree += 1; }
+            while (true): (degree += 1) { 
 
                 // check if node already existed in bucketed_roots with degree
                 // not exists => just put new node and return
@@ -210,9 +265,9 @@ pub fn FibonacciHeap(comptime T: type) type {
             }
         }
 
-        // meld (combine heap)
+        // TODO: meld (combine heap)
 
-        // decrease key
+        // TODO: Decrease key
 
         // pub fn prettyPrint() void {
         //     // if have time
@@ -253,4 +308,3 @@ fn FibonacciNode(comptime T: type) type {
         }
     };
 }
-
