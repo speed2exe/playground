@@ -1,4 +1,7 @@
+// this impl is super slow... just take it as a practice
+
 const std = @import("std");
+const Order = std.math.Order;
 const print = std.debug.print;
 const ArrayList = std.ArrayList;
 const test_allocator = std.testing.allocator;
@@ -56,6 +59,12 @@ pub fn main() !void {
 }
 
 test "FibonacciHeap 100 random u8" {
+    const now = std.time.nanoTimestamp();
+    defer {
+        const then = std.time.nanoTimestamp();
+        std.log.warn("nano sec: {d}",.{then - now});
+    }
+
     const data = [_]u8 {
         86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
         12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
@@ -76,6 +85,34 @@ test "FibonacciHeap 100 random u8" {
     // check the correctness of output (should be from 1 to 100)
     var expected: u8 = 1;
     while (fib_heap.pop() catch unreachable) |value| : (expected += 1) {
+        try std.testing.expectEqual(expected, value);
+    }
+}
+
+test "PQueue 100 random u8" {
+    const now = std.time.nanoTimestamp();
+    defer {
+        const then = std.time.nanoTimestamp();
+        std.log.warn("nano sec: {d}",.{then - now});
+    }
+
+    const data = [_]u8 {
+        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
+        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
+        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
+        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
+        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
+        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
+    };
+
+    var q = std.PriorityQueue(u8, u8, u8LessWithContext).init(test_allocator, @as(u8, 1));
+    defer q.deinit();
+    for (data) |value| {
+        try q.add(value);
+    }
+
+    var expected: u8 = 1;
+    while (q.removeOrNull()) |value| : (expected += 1) {
         try std.testing.expectEqual(expected, value);
     }
 }
@@ -110,6 +147,14 @@ test "FibonacciHeap 100 random u8" {
 
 fn u8Less(a: u8, b: u8) bool {
     return a < b;
+}
+
+fn u8LessWithContext(x: u8, a: u8, b: u8) Order {
+    _ = x;
+    if (a < b) {
+        return std.math.Order.lt;
+    }
+    return std.math.Order.gt;
 }
 
 pub fn FibonacciHeap(comptime T: type) type {
