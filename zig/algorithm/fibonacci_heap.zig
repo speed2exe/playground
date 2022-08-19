@@ -109,6 +109,7 @@ pub fn FibonacciHeap(comptime T: type) type {
         // Key must still be valid for the whole lifetime of this structure
         // if the key type is not primitive
         pub fn insert(self: *Self, key: T) !void {
+            print("insert: append called\n", .{});
             try self.unbucketed_roots.append(FibonacciNode(T).init(self.allocator, key));
         }
 
@@ -120,9 +121,8 @@ pub fn FibonacciHeap(comptime T: type) type {
                 self.bucketed_roots.items[staging_index] = null;
                 self.staging_index = null;
             }
-            var orphans = node.children.toOwnedSlice();
-            try self.unbucketed_roots.appendSlice(orphans);
-            node.children.clearRetainingCapacity();
+            try self.unbucketed_roots.appendSlice(node.children.items);
+            node.children.deinit();
             return node.key;
         }
 
@@ -251,6 +251,7 @@ fn FibonacciNode(comptime T: type) type {
         }
 
         fn add_child(self: *Self, child: FibonacciNode(T)) !void {
+            print("add_child: append called\n",.{});
             try self.children.append(child);
         }
     };
