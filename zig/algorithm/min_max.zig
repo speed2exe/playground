@@ -1,16 +1,15 @@
 // Finding min and max with 3/2n-2 comparison instead of 2n-2 comparison
 const std = @import("std");
-const warn = std.log.warn;
 const expectedEqual = std.testing.expectEqual;
 
-fn MinMaxResult(comptime T: type) type {
+pub fn MinMaxResult(comptime T: type) type {
     return struct {
         min: T,
         max: T,
     };
 }
 
-pub fn MinMax (
+pub fn minMax (
     comptime T: type,
     lessThan: fn(T, T) bool,
     data: []T,
@@ -44,7 +43,6 @@ pub fn MinMax (
                 bigger = temp;
             }
 
-            // warn("first: {d}, second: {d}",.{first,second});
             if (lessThan(smaller, min)) {
                 min = first;
             }
@@ -75,7 +73,7 @@ test "min max optimal comparison" {
         100, 41, 95, 73, 38, 30, 61, 59, 43, 5
     };
 
-    const result = MinMax(u8, u8less, &data) orelse unreachable;
+    const result = minMax(u8, u8less, &data) orelse unreachable;
     try expectedEqual(@as(u8, 1), result.min);
     try expectedEqual(@as(u8, 100), result.max);
 }
