@@ -20,6 +20,7 @@ pub fn best (
 }
 
 fn u8Better(a: u8, b: u8) bool {
+    std.sort
     return a > b;
 }
 

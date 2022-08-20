@@ -5,8 +5,46 @@ const std = @import("std");
 const testing = std.testing;
 // const print = std.debug.print;
 
+test "benchmark quickSort 1-100" {
+    // 1 to 100 random order
+    var data = [_]u8 {
+        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
+        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
+        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
+        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
+        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
+        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
+    };
+
+    const now = std.time.nanoTimestamp();
+    defer {
+        const then = std.time.nanoTimestamp();
+        std.log.warn("quicksort nano sec: {d}",.{then - now});
+    }
+
+    quickSort(u8, &data, u8Less);
+}
+
+test "benchmark std.sort 1-100" {
+    // 1 to 100 random order
+    var data = [_]u8 {
+        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
+        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
+        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
+        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
+        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
+        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
+    };
+
+    const now = std.time.nanoTimestamp();
+    defer {
+        const then = std.time.nanoTimestamp();
+        std.log.warn("std.sort nano sec: {d}",.{then - now});
+    }
+    std.sort.sort(u8, &data, @as(u8, 0), u8LessWithContex);
+}
+
 test "quickSort u8" {
-    std.Thread
     var array = [_]u8{3,2,5,9,7,6,4, 10, 99, 77, 88,55, 44, 22, 33};
     quickSort(u8, &array, u8Less);
 
@@ -21,7 +59,6 @@ test "quickSort string" {
     var string_array = [_][]const u8{"z", "b", "ac", "ab", "bc", "ba", "a"};
     quickSort([]const u8, &string_array, stringLessThan);
 
-    std.log.warn("{s}",.{string_array});
     var expected = [_][]const u8{ "a", "b", "z", "ab", "ac", "ba", "bc" };
     try testing.expectEqualSlices([]const u8,
         &expected,
@@ -30,6 +67,11 @@ test "quickSort string" {
 }
 
 fn u8Less(a: u8, b: u8) bool {
+    return a < b;
+}
+
+fn u8LessWithContex(c: u8, a: u8, b: u8) bool {
+    _ = c;
     return a < b;
 }
 
