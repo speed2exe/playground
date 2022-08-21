@@ -1,5 +1,6 @@
 const std = @import("std");
 const best = @import("./best.zig");
+const multi_slice = @import("./multi_slice.zig");
 
 // base2
 pub fn radixSort (
@@ -19,7 +20,11 @@ pub fn radixSort (
     }
 
     // assume bucket size is 2;
-    var buckets = try allocator.alloc(?T, data.len*2);
+    var buckets = blk: {
+        const buckets_size = 2;
+        var bucket_data = try allocator.alloc(T, data.len*buckets_size);
+        break :blk multi_slice.MultiSlice(T).initNumParts(buckets_size);
+    };
 
     // find largest bit len, TODO: check if need
     var biggest_key = best.best(T, higherUsize ,keys) orelse unreachable;
@@ -28,10 +33,27 @@ pub fn radixSort (
         biggest_key >>= 1;
         mask <<= 1;
     }) {
+        // initialize all len to 0
+        for (buckets_len) |*len| {
+            len.* = 0;
+        }
+
         for (keys) |key| {
+
+            // find bucket_index
             // can consider (key % buckets.len) if using variable len
-            if (key & mask == 0) {
-                buckets =
+            const bucket_index = if (key & mask == 0) 0 else 1;
+
+            const location = buckets_len * bucket_index + buckets_len[bucket_index];
+            buckets[location] = key;
+            buckets_len[bucket_index] += 1;
+        }
+
+        // put all the values back into the original array
+        {
+            var index = 0;
+            for (buckets) |bucket| {
+
             }
         }
     }
