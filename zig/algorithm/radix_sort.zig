@@ -1,4 +1,6 @@
 const std = @import("std");
+const expectEqual = std.testing.expectEqual;
+const test_allocator = std.testing.allocator;
 const best = @import("./best.zig");
 const multi_slice = @import("./multi_slice.zig");
 
@@ -34,11 +36,69 @@ pub fn main() !void {
     // }
 }
 
+test "radix sort 100 elem rand order" {
+    var data = [_]u8 {
+        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
+        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
+        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
+        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
+        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
+        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
+    };
+
+    try radixSort(u8, u8Key, &data, test_allocator);
+
+    for (data) |d, i| {
+        try expectEqual(i+1, d);
+    }
+}
+
+test "radix benchmark 2000,000" {
+    var random = std.rand.Isaac64.init(0).random();
+    var data: [8000_000]u8 = undefined;
+    for (data) |*value| {
+        value.* = random.int(u8);
+    }
+
+    const now = std.time.milliTimestamp();
+    defer {
+        const then = std.time.milliTimestamp();
+        std.log.warn("std.sort milli sec: {d}",.{then - now});
+    }
+
+    try radixSort(u8, u8Key, &data, test_allocator);
+}
+
+test "std.sort benchmark 2000,000" {
+    var random = std.rand.Isaac64.init(0).random();
+    var data: [8000_000]u8 = undefined;
+    for (data) |*value| {
+        value.* = random.int(u8);
+    }
+
+    const now = std.time.milliTimestamp();
+    defer {
+        const then = std.time.milliTimestamp();
+        std.log.warn("std.sort milli sec: {d}",.{then - now});
+    }
+
+    std.sort.sort(u8, &data, @as(u8, 0), u8LessWithContex);
+}
+
+fn u8LessWithContex(c: u8, a: u8, b: u8) bool {
+    _ = c;
+    return a < b;
+}
+
 pub fn u8Key(a: u8) usize {
     return @as(usize, a);
 }
 
-// base2
+pub fn usizeKey(a: usize) usize {
+    return a;
+}
+
+// base2 inplace sorting
 pub fn radixSort (
     comptime T: type,
     keyFromElem: fn (T) usize,

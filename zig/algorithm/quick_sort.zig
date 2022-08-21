@@ -44,6 +44,38 @@ test "benchmark std.sort 1-100" {
     std.sort.sort(u8, &data, @as(u8, 0), u8LessWithContex);
 }
 
+test "quicksort benchmark 1000,000" {
+    var random = std.rand.Isaac64.init(0).random();
+    var data: [1000_000]u8 = undefined;
+    for (data) |*value| {
+        value.* = random.int(u8);
+    }
+
+    const now = std.time.milliTimestamp();
+    defer {
+        const then = std.time.milliTimestamp();
+        std.log.warn("quicksort milli sec: {d}",.{then - now});
+    }
+
+    quickSort(u8, &data, u8Less);
+}
+
+test "std.sort benchmark 1000,000" {
+    var random = std.rand.Isaac64.init(0).random();
+    var data: [1000_000]u8 = undefined;
+    for (data) |*value| {
+        value.* = random.int(u8);
+    }
+
+    const now = std.time.milliTimestamp();
+    defer {
+        const then = std.time.milliTimestamp();
+        std.log.warn("std.sort milli sec: {d}",.{then - now});
+    }
+
+    std.sort.sort(u8, &data, @as(u8, 0), u8LessWithContex);
+}
+
 test "quickSort u8" {
     var array = [_]u8{3,2,5,9,7,6,4, 10, 99, 77, 88,55, 44, 22, 33};
     quickSort(u8, &array, u8Less);
