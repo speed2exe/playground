@@ -2,7 +2,7 @@ const std = @import("std");
 const best = @import("./best.zig");
 const multi_slice = @import("./multi_slice.zig");
 
-pub fn main() void {    
+pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     defer {
@@ -21,17 +21,17 @@ pub fn main() void {
         100, 41, 95, 73, 38, 30, 61, 59, 43, 5
     };
 
-    // const now = std.time.nanoTimestamp();
-    // defer {
-    //     const then = std.time.nanoTimestamp();
-    //     std.log.warn("quicksort nano sec: {d}",.{then - now});
-    // }
+    const now = std.time.nanoTimestamp();
+    defer {
+        const then = std.time.nanoTimestamp();
+        std.log.warn("quicksort nano sec: {d}",.{then - now});
+    }
 
     try radixSort(u8, u8Key, &data, allocator);
 
-    for (data) |d| {
-        std.debug.print("{d}\n", .{d});
-    }
+    // for (data) |d| {
+    //     std.debug.print("{d},", .{d});
+    // }
 }
 
 pub fn u8Key(a: u8) usize {
@@ -63,8 +63,8 @@ pub fn radixSort (
 
     // lock in answer after computation
     defer {
-        for (radix_elems) |radix_elem| {
-            elems[radix_elem.index] = radix_elem.elem;
+        for (radix_elems) |radix_elem, index| {
+            elems[index] = radix_elem.elem;
         }
     }
 
@@ -111,7 +111,9 @@ pub fn radixSort (
         // put all the elems from buckets back to radix_elems
         {
             var index: usize = 0;
-            while (true) {
+            var buckets_iterator = buckets.getIterator();
+            var bucket_index: usize = 0;
+            while (buckets_iterator.next()) |bucket| : (bucket_index += 1) {
                 for (bucket[0..buckets_elem_len[bucket_index]]) |bucket_elem| {
                     radix_elems[index] = bucket_elem;
                     index += 1;
@@ -128,7 +130,6 @@ fn RadixElem(comptime T: type) type {
         key: usize,
     };
 }
-
 
 fn higherKey(comptime T: type) fn(RadixElem(T), RadixElem(T)) bool {
     return struct {

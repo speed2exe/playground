@@ -64,7 +64,7 @@ fn MultiSliceIterator(comptime T: type) type {
             };
         }
 
-        fn next(self: *Self) ?[]T {
+        pub fn next(self: *Self) ?[]T {
             if (self.consumed == self.multi_slice.len) {
                 return null;
             }
