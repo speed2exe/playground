@@ -130,6 +130,7 @@ fn stringLessThan(a: []const u8, b: []const u8) bool {
 
 // quickSort sorts the data inplace
 // quickSort is basically recursive partitioning
+// good for small datasets
 pub fn quickSort (
     comptime T: type,
     data: []T, // array to be sorted

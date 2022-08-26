@@ -46,7 +46,7 @@ test "radix sort 100 elem rand order" {
         100, 41, 95, 73, 38, 30, 61, 59, 43, 5
     };
 
-    try radixSort(u8, u8Key, &data, test_allocator);
+    try radixSort(u8, u8Key, &data, test_allocator, 8);
 
     for (data) |d, i| {
         try expectEqual(i+1, d);
@@ -66,7 +66,7 @@ test "radix benchmark 2000,000" {
         std.log.warn("std.sort milli sec: {d}",.{then - now});
     }
 
-    try radixSort(u8, u8Key, &data, test_allocator);
+    try radixSort(u8, u8Key, &data, test_allocator, 8);
 }
 
 test "std.sort benchmark 2000,000" {
@@ -98,12 +98,12 @@ pub fn usizeKey(a: usize) usize {
     return a;
 }
 
-// base2 inplace sorting
 pub fn radixSort (
     comptime T: type,
     keyFromElem: fn (T) usize,
     elems: []T,
     allocator: std.mem.Allocator,
+    buckets_size: usize,
 ) !void {
     if (elems.len == 0) {
         return;
@@ -128,8 +128,6 @@ pub fn radixSort (
         }
     }
 
-    // assume bucket size is 2;
-    const buckets_size = 2;
     var bucket_data = try allocator.alloc(RadixElem(T), elems.len * buckets_size);
     defer allocator.free(bucket_data);
 
@@ -145,26 +143,21 @@ pub fn radixSort (
     var biggest_elem = best.best(RadixElem(T), higherKey(T), radix_elems) orelse unreachable;
     var biggest_key = biggest_elem.key;
 
-    var mask: usize = 0b1;
-    while (biggest_key > 0): ({
-        biggest_key >>= 1;
-        mask <<= 1;
-    }) {
+    var mask: usize = buckets_size;
+    while (biggest_key > 0): (biggest_key /= buckets_size) {
         // initialize all len to 0
         for (buckets_elem_len) |*len| {
             len.* = 0;
         }
 
-        for (radix_elems) |radix_elem| {
+        for (radix_elems) |*radix_elem| {
             // find bucket_index
-            // can consider (key % buckets.len) if using variable len
-            const bucket_index: usize =
-                if (radix_elem.key & mask == 0) 0
-                else 1;
+            const bucket_index: usize = radix_elem.key % mask;
+            radix_elem.key /= mask;
 
             var chosen_bucket = buckets.getNthSlice(bucket_index);
             const elem_index = buckets_elem_len[bucket_index];
-            chosen_bucket[elem_index] = radix_elem;
+            chosen_bucket[elem_index] = radix_elem.*;
             buckets_elem_len[bucket_index] += 1;
         }
 

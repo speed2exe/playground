@@ -72,9 +72,7 @@ test "min max optimal comparison" {
         32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
         100, 41, 95, 73, 38, 30, 61, 59, 43, 5
     };
-
     const result = minMax(u8, u8less, &data) orelse unreachable;
     try expectedEqual(@as(u8, 1), result.min);
     try expectedEqual(@as(u8, 100), result.max);
 }
-
