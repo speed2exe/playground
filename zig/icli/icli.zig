@@ -2,8 +2,6 @@ const std = @import("std");
 const linux = std.os.linux;
 
 pub fn main() !void {
-    // var buffer: [1]u8 = undefined;
-
     var tty = try std.fs.openFileAbsolute("/dev/tty", .{});
 
     try setRaw(tty);
@@ -13,8 +11,8 @@ pub fn main() !void {
 
     var tty_reader = tty.reader();
     while (true) {
-        const byte = tty_reader.readByte() catch unreachable;
-        if (byte == 3) {
+        const byte = try tty_reader.readByte();
+        if (byte == 3) { // Ctrl-C
             return;
         }
         std.debug.print("byte read: {d}\r\n", .{byte});
