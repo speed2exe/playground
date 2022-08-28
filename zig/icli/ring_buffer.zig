@@ -38,6 +38,21 @@ pub fn RingBuffer (
             return ringCopy(dest, &self.buffer, &self.head, self.tail);
         }
 
+        // Get view of next set of input without copying
+        pub fn readConst(self: *Self) ![]const u8 {
+            if (self.unread() == 0) {
+                try self.load();
+            }
+            if (self.tail > self.head) {
+                const view = self.buffer[self.head..self.tail];
+                self.head = self.tail;
+                return view;
+            }
+            const view = self.buffer[self.head..];
+            self.head = 0;
+            return view;
+        }
+
         pub fn load(self: *Self) !void {
             if (self.head == self.tail) {
                 self.head = 0;

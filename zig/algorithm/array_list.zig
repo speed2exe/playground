@@ -86,6 +86,11 @@ pub fn Array(comptime T: type) type {
             quick_sort.quickSort(T, self.getAll(), less);
         }
 
+        // TODO: Test append after truncate
+        pub fn truncate(self: *Self, n: usize) void {
+            self.len = n;
+        }
+
         fn ensureCapacity(self: *Self, cap: usize) !void {
             if (self.elems.len >= cap) {
                 return;
