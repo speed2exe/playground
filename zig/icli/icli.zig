@@ -115,7 +115,7 @@ pub fn main() !void {
     }
 }
 
-// adopted from go-tty
+// base on: https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
 // only works for linux
 // TODO: make this work for other platforms
 fn setRaw(file: File) !void {
@@ -123,7 +123,7 @@ fn setRaw(file: File) !void {
 
     termios.iflag &= ~(linux.IGNBRK | linux.BRKINT | linux.PARMRK | linux.ISTRIP | linux.INLCR | linux.IGNCR | linux.ICRNL | linux.IXON);
     termios.oflag &= ~linux.OPOST;
-    termios.lflag &= ~(linux.ECHO | linux.ECHONL | linux.ICANON | linux.ISIG |linux.IEXTEN);
+    termios.lflag &= ~(linux.ECHO | linux.ECHONL | linux.ICANON | linux.ISIG | linux.IEXTEN);
     termios.cflag &= ~(linux.CSIZE | linux.PARENB);
     termios.cflag |= linux.CS8;
     termios.cc[linux.V.MIN] = 1;
