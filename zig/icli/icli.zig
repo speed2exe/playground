@@ -43,8 +43,9 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         fn fillCommandBuffer(self: *Self) !void {
+            const original_termios = try std.os.tcgetattr(self.tty.handle);
             try setRaw(self.tty);
-            defer unsetRaw(self.tty) catch |err| {
+            defer unsetRaw(self.tty, original_termios) catch |err| {
                 std.debug.print("unsetRaw failed, {}", .{err});
             };
 
@@ -96,9 +97,9 @@ pub const Settings = struct {
 
 pub fn main() !void {
     var tty = try std.fs.openFileAbsolute("/dev/tty", .{});
-
+    var original_termios = try std.os.tcgetattr(tty.handle);
     try setRaw(tty);
-    defer unsetRaw(tty) catch |err| {
+    defer unsetRaw(tty, original_termios) catch |err| {
         std.debug.print("unsetRaw failed, {}", .{err});
     };
 
@@ -110,13 +111,14 @@ pub fn main() !void {
             return;
         }
         buf[0] = byte;
-        std.debug.print("{s}", .{buf});
+        std.debug.print("{s}, {d}\r\n", .{buf, buf});
     }
 }
 
+// adopted from go-tty
 // only works for linux
 // TODO: make this work for other platforms
-fn setRaw(file: std.fs.File) !void {
+fn setRaw(file: File) !void {
     var termios = try std.os.tcgetattr(file.handle);
 
     termios.iflag &= ~(linux.IGNBRK | linux.BRKINT | linux.PARMRK | linux.ISTRIP | linux.INLCR | linux.IGNCR | linux.ICRNL | linux.IXON);
@@ -130,7 +132,6 @@ fn setRaw(file: std.fs.File) !void {
     try std.os.tcsetattr(file.handle, linux.TCSA.NOW, termios);
 }
 
-fn unsetRaw(file: std.fs.File) !void {
-    var termios = try std.os.tcgetattr(file.handle);
+fn unsetRaw(file: File, termios: std.os.termios) !void {
     try std.os.tcsetattr(file.handle, linux.TCSA.NOW, termios);
 }
