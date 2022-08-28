@@ -96,18 +96,46 @@ test "ringBuffer" {
         try testing.expectEqualSlices(u8, expected, buffer[0..4]);
     }
     {
-        var buffer: [10]u8 = undefined;
+        var buffer: [1]u8 = undefined;
         const n = try ring_buffer_reader.read(&buffer);
-        const expected = "6789";
-        try testing.expect(n == 4);
+        const expected = "6";
+        try testing.expect(n == expected.len);
+        try testing.expect(ring_buffer.unread() == 3);
+        try testing.expectEqualSlices(u8, expected, buffer[0..expected.len]);
+
+        const expected_buffer_contents = "67894";
+        try testing.expectEqualSlices(u8, expected_buffer_contents, &ring_buffer.buffer);
+    }
+    {
+        var buffer: [1]u8 = undefined;
+        const n = try ring_buffer_reader.read(&buffer);
+        const expected = "7";
+        try testing.expect(n == expected.len);
+        try testing.expect(ring_buffer.unread() == 2);
+        try testing.expectEqualSlices(u8, expected, buffer[0..expected.len]);
+
+        const expected_buffer_contents = "67894";
+        try testing.expectEqualSlices(u8, expected_buffer_contents, &ring_buffer.buffer);
+    }
+    {
+        var buffer: [5]u8 = undefined;
+        const n = try ring_buffer_reader.read(&buffer);
+        const expected = "89";
+        try testing.expect(n == expected.len);
         try testing.expect(ring_buffer.unread() == 0);
-        try testing.expectEqualSlices(u8, expected, buffer[0..4]);
+        try testing.expectEqualSlices(u8, expected, buffer[0..expected.len]);
+
+        const expected_buffer_contents = "67894";
+        try testing.expectEqualSlices(u8, expected_buffer_contents, &ring_buffer.buffer);
     }
     {
         var buffer: [10]u8 = undefined;
         const n = try ring_buffer_reader.read(&buffer);
-        try testing.expect(ring_buffer.unread() == 0);
         try testing.expect(n == 0);
+        try testing.expect(ring_buffer.unread() == 0);
+
+        const expected_buffer_contents = "67894";
+        try testing.expectEqualSlices(u8, expected_buffer_contents, &ring_buffer.buffer);
     }
 }
 
