@@ -1,64 +1,75 @@
 const std = @import("std");
 const testing = std.testing;
 
-// pub const RingBuffer = struct {
-//     source: std.io.Reader,
-//     buffer: []u8,
-// 
-//     // inclusive
-//     head: usize = 0,
-//     // exclusive
-//     tail: usize = 0,
-// 
-//     allocator: ?std.mem.Allocator = null,
-// 
-//     pub fn initWithAllocator(reader: std.io.Reader, allocator: std.mem.Allocator, buffer_size: usize) RingBuffer {
-//         var buffer = allocator.alloc(u8, buffer_size);
-//         return RingBuffer {
-//             .source = reader,
-//             .buffer = buffer,
-//             .allocator = allocator,
-//         };
-//     }
-// 
-//     pub fn initWithBuffer(reader: std.io.Reader, buffer: []u8) RingBuffer {
-//         return RingBuffer {
-//             .source = reader,
-//             .buffer = buffer,
-//             .head = 0,
-//             .tail = 0,
-//         };
-//     }
-// 
-//     // user dont need to call this if you use initWithBuffer
-//     pub fn deinit(self: *RingBuffer) void {
-//        var allocator = self.allocator orelse return;
-//        allocator.free(self.buffer);
-//     }
-// 
-//     pub const Reader = std.io.Reader(RingBuffer, anyerror, read);
-// 
-//     pub fn reader(self: *RingBuffer) Reader {
-//         return Reader {
-//             .context = self,
-//         };
-//     }
-// 
-//     pub fn read(self: *RingBuffer, dest: []u8) !usize {
-//         const head = self.head;
-//         const tail = self.tail;
-// 
-// 
-//         
-//     }
-// };
+pub const RingBuffer = struct {
+    source: std.io.Reader,
+    buffer: []u8,
+
+    // inclusive
+    head: usize = 0,
+    // exclusive
+    tail: usize = 0,
+
+    allocator: ?std.mem.Allocator = null,
+
+    pub fn initWithAllocator(reader: std.io.Reader, allocator: std.mem.Allocator, buffer_size: usize) RingBuffer {
+        var buffer = allocator.alloc(u8, buffer_size);
+        return RingBuffer {
+            .source = reader,
+            .buffer = buffer,
+            .allocator = allocator,
+        };
+    }
+
+    pub fn initWithBuffer(reader: std.io.Reader, buffer: []u8) RingBuffer {
+        return RingBuffer {
+            .source = reader,
+            .buffer = buffer,
+            .head = 0,
+            .tail = 0,
+        };
+    }
+
+    // user dont need to call this if you use initWithBuffer
+    pub fn deinit(self: *RingBuffer) void {
+       var allocator = self.allocator orelse return;
+       allocator.free(self.buffer);
+    }
+
+    pub const Reader = std.io.Reader(RingBuffer, anyerror, read);
+
+    pub fn reader(self: *RingBuffer) Reader {
+        return Reader {
+            .context = self,
+        };
+    }
+
+    pub fn read(self: *RingBuffer, dest: []u8) !usize {
+        if (self.head == self.tail) {
+            self.head = 0;
+            self.tail = try self.source.read(self.buffer);
+        }
+
+        return ringCopy(dest, self.buffer, &self.head, self.tail);
+    }
+
+    pub fn load(self: *RingBuffer) !void {
+        if (self.tail < self.buffer.len) {
+            self.tail += try self.source.read(self.buffer[self.tail..]);
+        }
+        if (self.tail == self.buffer.len) {
+            if (self.head < 2) {
+                return;
+            }
+            self.tail = try self.source.read(self.buffer[0..self.head - 1]);
+        }
+    }
+};
 
 fn ringCopy(dest: []u8, src: []u8, head_ptr: *usize, tail: usize) usize {
     const head = head_ptr.*;
 
     if (tail == head) {
-        // tail_ptr.* = 0;
-        // head_ptr.* = 0;
         return 0;
     }
 
