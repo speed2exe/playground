@@ -1,10 +1,10 @@
 const std = @import("std");
 const testing = std.testing;
 
-const StringReader = struct {
+pub const StringReader = struct {
     data: []const u8,
 
-    const Reader = std.io.Reader(*StringReader, anyerror, read);
+    pub const Reader = std.io.Reader(*StringReader, anyerror, read);
 
     pub fn init(data: []const u8) StringReader {
         return StringReader {

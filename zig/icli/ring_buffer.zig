@@ -1,22 +1,19 @@
 const std = @import("std");
 const testing = std.testing;
+const string_reader = @import("./string_reader.zig");
+const StringReader = string_reader.StringReader;
 
-pub fn main() void {
-
-}
-
-// TODO: test
-pub fn RingBuffer(
+pub fn RingBuffer (
     comptime buffer_size: comptime_int,
-    comptime Context: type,
-    comptime ReadError: type,
-    comptime readFn: fn (context: Context, buffer: []u8) ReadError!usize,
+    comptime ReaderType: type,
 ) type {
     return struct {
+        pub const ReadError = ReaderType.Error;
+
         const Self = @This();
 
-        source: std.io.Reader(Context, ReadError, readFn),
-        buffer: [buffer_size]u8,
+        source: ReaderType,
+        buffer: [buffer_size]u8 = undefined,
 
         // inclusive
         head: usize = 0,
@@ -25,7 +22,7 @@ pub fn RingBuffer(
 
         pub const Reader = std.io.Reader(*Self, ReadError, read);
 
-        pub fn init(source: std.io.Reader(Context, ReadError, readFn)) Self {
+        pub fn init(source: ReaderType) Self {
             return Self { .source = source };
         }
 
@@ -34,30 +31,84 @@ pub fn RingBuffer(
         }
 
         pub fn read(self: *Self, dest: []u8) !usize {
-            if (self.head == self.tail) {
-                self.head = 0;
-                self.tail = try self.source.read(&self.buffer);
+            const unread_count = self.unread();
+            if (dest.len > unread_count) { // can read more to fill dest
+                try self.load();
             }
-
-            return ringCopy(dest, self.buffer, &self.head, self.tail);
+            return ringCopy(dest, &self.buffer, &self.head, self.tail);
         }
 
         pub fn load(self: *Self) !void {
-            if (self.tail < self.buffer.len) {
-                self.tail += try self.source.read(&self.buffer[self.tail..]);
+            if (self.head == self.tail) {
+                self.head = 0;
+                self.tail = try self.source.read(&self.buffer);
+                return;
             }
-            if (self.tail == self.buffer.len) {
-                if (self.head < 2) {
-                    return;
+
+            if (self.tail > self.head) {
+                self.tail += try self.source.read(self.buffer[self.tail..]);
+                if (self.tail == self.buffer.len and self.head > 1) {
+                    self.tail = try self.source.read(self.buffer[0..self.head - 1]);
                 }
-                self.tail = try self.source.read(&self.buffer[0..self.head - 1]);
+                return;
             }
+
+            self.tail += try self.source.read(self.buffer[self.tail..self.head - 1]);
+        }
+
+        pub fn unread(self: *Self) usize {
+            return ringUnread(self.head, self.tail, self.buffer.len);
         }
     };
 }
 
 test "ringBuffer" {
-    RingBuffer(16);
+    var input = StringReader.init("0123456789");
+    var input_reader = input.reader();
+    var ring_buffer = RingBuffer(5, StringReader.Reader).init(input_reader);
+    var ring_buffer_reader = ring_buffer.reader();
+
+    {
+        var buffer: [2]u8 = undefined;
+        const n = try ring_buffer_reader.read(&buffer);
+
+        const expected = "01";
+        try testing.expect(n == 2);
+        try testing.expect(ring_buffer.unread() == 3);
+        try testing.expectEqualSlices(u8, expected, &buffer);
+
+        const expected_buffer_contents = "01234";
+        try testing.expectEqualSlices(u8, expected_buffer_contents, &ring_buffer.buffer);
+    }
+    {
+        try ring_buffer.load();
+        const expected_buffer_contents = "51234";
+        try testing.expect(ring_buffer.unread() == 4);
+        try testing.expectEqualSlices(u8, expected_buffer_contents, &ring_buffer.buffer);
+    }
+    {
+        var buffer: [10]u8 = undefined;
+        const n = try ring_buffer_reader.read(&buffer);
+
+        const expected = "2345";
+        try testing.expectEqual(n, 4);
+        try testing.expect(ring_buffer.unread() == 0);
+        try testing.expectEqualSlices(u8, expected, buffer[0..4]);
+    }
+    {
+        var buffer: [10]u8 = undefined;
+        const n = try ring_buffer_reader.read(&buffer);
+        const expected = "6789";
+        try testing.expect(n == 4);
+        try testing.expect(ring_buffer.unread() == 0);
+        try testing.expectEqualSlices(u8, expected, buffer[0..4]);
+    }
+    {
+        var buffer: [10]u8 = undefined;
+        const n = try ring_buffer_reader.read(&buffer);
+        try testing.expect(ring_buffer.unread() == 0);
+        try testing.expect(n == 0);
+    }
 }
 
 fn ringCopy(dest: []u8, src: []u8, head_ptr: *usize, tail: usize) usize {
@@ -175,6 +226,7 @@ test "ringCopy - 5" {
     try testing.expect(n == 5);
 }
 
+// copy copies maximum copyable bytes from src to dest.
 fn copy(dest: []u8, src: []u8) usize {
     var max_copyable = src.len;
     if (dest.len < max_copyable) {
@@ -210,4 +262,11 @@ test "test copy 3" {
 
     var expected = [_]u8{1, 2, 3, 4, 5};
     try testing.expectEqualSlices(u8, &dest, &expected);
+}
+
+fn ringUnread(head: usize, tail: usize, len: usize) usize {
+    if (tail >= head) {
+        return tail - head;
+    }
+    return len - head + tail;
 }
