@@ -151,8 +151,11 @@ fn getRawModeTermios(termios: std.os.termios) std.os.termios {
     return raw_mode;
 }
 
+// only works for linux
+// TODO: make this work for other platforms
 fn setTermios(file: File, termios: std.os.termios) !void {
     try std.os.tcsetattr(file.handle, linux.TCSA.NOW, termios);
 }
 
 // TODO: create output ring writer buffer
+// TODO: get terminal size
