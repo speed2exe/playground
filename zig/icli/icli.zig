@@ -10,20 +10,31 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         const RingBuffer = ring_buffer.RingBuffer(comptime_settings.input_buffer_size, File.Reader);
 
         tty: File,
-        settings: Settings,
         input: RingBuffer,
+        original_termios: std.os.termios,
+        raw_mode_termios: std.os.termios,
         command_buffer: array_list.Array(u8),
         allocator: std.mem.Allocator,
+        settings: Settings,
 
-        pub fn init(settings: Settings) File.OpenError!Self {
+        pub fn init(settings: Settings) !Self {
             var tty = try std.fs.openFileAbsolute("/dev/tty", .{});
+            if (!tty.isTty()) {
+                return error.DeviceNotTty;
+            }
             var input = RingBuffer.init(tty.reader());
+
+            const original_termios = try std.os.tcgetattr(tty.handle);
+            const raw_mode_termios = getRawModeTermios(original_termios);
+
             return Self {
                 .tty = tty,
-                .allocator = settings.allocator,
-                .settings = settings,
                 .input = input,
+                .original_termios = original_termios,
+                .raw_mode_termios = raw_mode_termios,
+                .allocator = settings.allocator,
                 .command_buffer = array_list.Array(u8).init(settings.allocator),
+                .settings = settings,
             };
         }
 
@@ -43,9 +54,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         fn fillCommandBuffer(self: *Self) !void {
-            const original_termios = try std.os.tcgetattr(self.tty.handle);
-            try setRaw(self.tty);
-            defer unsetRaw(self.tty, original_termios) catch |err| {
+            try self.setRawInputMode();
+            defer self.setOriginalInputMode() catch |err| {
                 std.debug.print("unsetRaw failed, {}", .{err});
             };
 
@@ -60,7 +70,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                     }
                 }
                 std.debug.print("{s}", .{input});
-                // generate autocomplete?
+
+                // TODO: generate autocomplete here?
             }
         }
 
@@ -81,6 +92,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             return false;
         }
 
+        fn setRawInputMode(self: *Self) !void {
+            try setTermios(self.tty, self.raw_mode_termios);
+        }
+
+        fn setOriginalInputMode(self: *Self) !void {
+            try setTermios(self.tty, self.original_termios);
+        }
+
     };
 }
 
@@ -89,6 +108,7 @@ pub const ComptimeSettings = struct {
 };
 
 pub const Settings = struct {
+    welcome_message: []const u8 = "Welcome!",
     allocator: std.mem.Allocator,
     execute: fn([]const u8) bool,
     suggest: ?fn([]const u8, usize) [][]const u8 = null,
@@ -98,8 +118,9 @@ pub const Settings = struct {
 pub fn main() !void {
     var tty = try std.fs.openFileAbsolute("/dev/tty", .{});
     var original_termios = try std.os.tcgetattr(tty.handle);
-    try setRaw(tty);
-    defer unsetRaw(tty, original_termios) catch |err| {
+    var raw_mode_termios = getRawModeTermios(original_termios);
+    try setTermios(tty, raw_mode_termios);
+    defer setTermios(tty, original_termios) catch |err| {
         std.debug.print("unsetRaw failed, {}", .{err});
     };
 
@@ -115,23 +136,23 @@ pub fn main() !void {
     }
 }
 
-// base on: https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
+// based on: https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
 // only works for linux
 // TODO: make this work for other platforms
-fn setRaw(file: File) !void {
-    var termios = try std.os.tcgetattr(file.handle);
+fn getRawModeTermios(termios: std.os.termios) std.os.termios {
+    var raw_mode = termios;
+    raw_mode.iflag &= ~(linux.IGNBRK | linux.BRKINT | linux.PARMRK | linux.ISTRIP | linux.INLCR | linux.IGNCR | linux.ICRNL | linux.IXON);
+    raw_mode.oflag &= ~linux.OPOST;
+    raw_mode.lflag &= ~(linux.ECHO | linux.ECHONL | linux.ICANON | linux.ISIG | linux.IEXTEN);
+    raw_mode.cflag &= ~(linux.CSIZE | linux.PARENB);
+    raw_mode.cflag |= linux.CS8;
+    raw_mode.cc[linux.V.MIN] = 1;
+    raw_mode.cc[linux.V.TIME] = 0;
+    return raw_mode;
+}
 
-    termios.iflag &= ~(linux.IGNBRK | linux.BRKINT | linux.PARMRK | linux.ISTRIP | linux.INLCR | linux.IGNCR | linux.ICRNL | linux.IXON);
-    termios.oflag &= ~linux.OPOST;
-    termios.lflag &= ~(linux.ECHO | linux.ECHONL | linux.ICANON | linux.ISIG | linux.IEXTEN);
-    termios.cflag &= ~(linux.CSIZE | linux.PARENB);
-    termios.cflag |= linux.CS8;
-    termios.cc[linux.V.MIN] = 1;
-    termios.cc[linux.V.TIME] = 0;
-
+fn setTermios(file: File, termios: std.os.termios) !void {
     try std.os.tcsetattr(file.handle, linux.TCSA.NOW, termios);
 }
 
-fn unsetRaw(file: File, termios: std.os.termios) !void {
-    try std.os.tcsetattr(file.handle, linux.TCSA.NOW, termios);
-}
+// TODO: create output ring writer buffer
