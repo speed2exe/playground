@@ -23,11 +23,11 @@ pub fn RingBuffer (
         pub fn init() Self { return Self {}; }
 
         pub fn reader(self: *Self) Reader {
-            return Reader { .context = self };
+            return .{ .context = self };
         }
 
         pub fn writer(self: *Self) Writer {
-            return Writer { .context = self };
+            return .{ .context = self };
         }
 
         pub fn read(self: *Self, dest: []u8) !usize {
@@ -39,9 +39,9 @@ pub fn RingBuffer (
         }
 
         // contents that is read from reader will be put into the buffer
-        // pub fn readFrom(self: *Self, comptime ReaderType: type, reader: ReaderType) !usize {
-        //     return ringReadFrom(ReaderType, reader, &self.buffer, &self.head, self.tail);
-        // }
+        pub fn readFrom(self: *Self, comptime ReaderType: type, src: ReaderType) !usize {
+            return try ringReadFrom(ReaderType, src, &self.buffer, &self.head, &self.tail);
+        }
 
         // Get view of next set of input without copying.
         // Acts like a read which "consumes" the buffer.
@@ -184,7 +184,7 @@ test "ringRead - 5" {
     try testing.expect(n == 4);
 }
 
-test "ringRead - 5" {
+test "ringRead - 6" {
     var dest = [_]u8{0, 0, 0, 0, 0};
     var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     var head: usize = 8;
@@ -355,12 +355,46 @@ fn ringReadConst(buffer: []u8, head_ptr: *usize, tail: usize) []const u8 {
     return view;
 }
 
-// fn ringReadFrom (
-//     comptime ReaderType: type,
-//     reader: ReaderType,
-//     buffer: []u8,
-//     &self.head,
-//     self.tail
-// ) usize {
-// 
-// }
+// Implementation is very similiar to ringWrite
+fn ringReadFrom(
+    comptime ReaderType: type,
+    reader: ReaderType,
+    buffer: []u8,
+    head_ptr: *usize,
+    tail_ptr: *usize,
+) !usize {
+    var tail = tail_ptr.*;
+    const head = head_ptr.*;
+    defer { tail_ptr.* = tail; }
+
+    if (head == tail) {
+        head_ptr.* = 0;
+        tail = try reader.read(buffer);
+        return tail;
+    }
+
+    if (tail > head) {
+        var n = try reader.read(buffer[tail..]);
+        tail += n;
+        if (tail == buffer.len and head > 1) {
+            tail = try reader.read(buffer[0..head - 1]);
+            n += tail;
+        }
+        return n;
+    }
+
+    const n = try reader.read(buffer[tail..head - 1]);
+    tail += n;
+    return n;
+}
+
+test "test readFrom" {
+    var data = StringReader.init("0123456789").reader();
+    var ring_buffer = RingBuffer(8).init();
+
+    {
+        const n = try ring_buffer.readFrom(StringReader.Reader, data);
+        try testing.expect(n == 8);
+        try testing.expectEqualSlices(u8, "01234567", &ring_buffer.buffer);
+    }
+}
