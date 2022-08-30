@@ -39,8 +39,13 @@ pub fn RingBuffer (
         }
 
         // contents that is read from reader will be put into the buffer
-        pub fn readFrom(self: *Self, comptime ReaderType: type, src: ReaderType) !usize {
-            return try ringReadFrom(ReaderType, src, &self.buffer, &self.head, &self.tail);
+        pub fn readFrom(self: *Self, comptime ReaderType: type, r: ReaderType) !usize {
+            return try ringReadFrom(ReaderType, r, &self.buffer, &self.head, &self.tail);
+        }
+
+        // writer will write as much contents as possible from the buffer
+        pub fn writeTo(self: *Self, comptime WriterType: type, w: WriterType) !usize {
+            return try ringWriteTo(WriterType, w, &self.buffer, &self.head, self.tail);
         }
 
         // Get view of next set of input without copying.
@@ -396,5 +401,72 @@ test "test readFrom" {
         const n = try ring_buffer.readFrom(StringReader.Reader, data);
         try testing.expect(n == 8);
         try testing.expectEqualSlices(u8, "01234567", &ring_buffer.buffer);
+    }
+}
+
+fn ringWriteTo(
+    comptime WriterType: type,
+    writer: WriterType,
+    buffer: []const u8,
+    head_ptr: *usize,
+    tail: usize
+) !usize {
+    var head = head_ptr.*;
+    if (tail == head) {
+        return 0;
+    }
+
+    defer { head_ptr.* = head; }
+
+    if (tail > head) {
+        const n = try writer.write(buffer[head..tail]);
+        head += n;
+        return n;
+    }
+
+    const n = try writer.write(buffer[head..]);
+    head += n;
+    if (head < buffer.len) { // did not write till the end
+        return n;
+    }
+
+    const m = try writer.write(buffer[0..tail]);
+    head = m;
+    return n + m;
+}
+
+test "test writeTo" {
+    // populate
+    var data = StringReader.init("0123456789").reader();
+    var ring_buffer = RingBuffer(10).init();
+    _ = try ring_buffer.readFrom(StringReader.Reader, data);
+
+    var buffer: [10]u8 = undefined;
+    const fbs_t = std.io.FixedBufferStream([]u8);
+    var fbs = fbs_t{ .buffer = &buffer, .pos = 0, };
+
+    {
+        const n = try ring_buffer.writeTo(fbs_t.Writer, fbs.writer());
+        try testing.expectEqualSlices(u8, "0123456789", &buffer);
+        try testing.expect(n == 10);
+    }
+}
+
+test "test writeTo - 2" {
+    // populate
+    var data = StringReader.init("abcdefghij").reader();
+    var ring_buffer = RingBuffer(10).init();
+    _ = try ring_buffer.readFrom(StringReader.Reader, data);
+    ring_buffer.head = 7;
+    ring_buffer.tail = 2;
+
+    var buffer: [10]u8 = undefined;
+    const fbs_t = std.io.FixedBufferStream([]u8);
+    var fbs = fbs_t{ .buffer = &buffer, .pos = 0, };
+
+    {
+        const n = try ring_buffer.writeTo(fbs_t.Writer, fbs.writer());
+        try testing.expect(n == 5);
+        try testing.expectEqualSlices(u8, "hijab", buffer[0..n]);
     }
 }
