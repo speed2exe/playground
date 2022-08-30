@@ -20,12 +20,14 @@ pub fn RingBuffer (
         pub const Reader = std.io.Reader(*Self, anyerror, read);
         pub const Writer = std.io.Writer(*Self, anyerror, write);
 
+        pub fn init() Self { return Self {}; }
+
         pub fn reader(self: *Self) Reader {
             return Reader { .context = self };
         }
 
-        pub fn writer(self: *Self) Reader {
-            return Reader { .context = self };
+        pub fn writer(self: *Self) Writer {
+            return Writer { .context = self };
         }
 
         pub fn read(self: *Self, dest: []u8) !usize {
@@ -33,26 +35,59 @@ pub fn RingBuffer (
         }
 
         pub fn write(self: *Self, src: []const u8) !usize {
-            return ringWrite(src, &self.buffer, &self.head, self.tail);
+            return ringWrite(src, &self.buffer, &self.head, &self.tail);
         }
 
-        // Get view of next set of input without copying
-        // acts like a read
+        // contents that is read from reader will be put into the buffer
+        // pub fn readFrom(self: *Self, comptime ReaderType: type, reader: ReaderType) !usize {
+        //     return ringReadFrom(ReaderType, reader, &self.buffer, &self.head, self.tail);
+        // }
+
+        // Get view of next set of input without copying.
+        // Acts like a read which "consumes" the buffer.
         pub fn readConst(self: *Self) ![]const u8 {
-            if (self.tail > self.head) {
-                const view = self.buffer[self.head..self.tail];
-                self.head = self.tail;
-                return view;
-            }
-            const view = self.buffer[self.head..];
-            self.head = 0;
-            return view;
+            return ringReadConst(&self.buffer, &self.head, self.tail);
         }
 
         pub fn unreadBytes(self: *Self) usize {
             return ringUnreadBytes(self.head, self.tail, self.buffer.len);
         }
     };
+}
+
+test "RingBuffer" {
+    var ring = RingBuffer(10).init();
+    var ring_reader = ring.reader();
+    var ring_writer = ring.writer();
+
+    {
+        var buf = [_]u8{0, 0, 0};
+        const n = try ring_reader.read(&buf);
+        try testing.expect(n == 0);
+    }
+    {
+        const n = try ring_writer.write("hello");
+        var buf = [_]u8{0, 0, 0};
+        const m = try ring_reader.read(&buf);
+        try testing.expect(n == 5);
+        try testing.expect(m == 3);
+        try testing.expectEqualSlices(u8, &buf, "hel");
+    }
+    {
+        const n = try ring_writer.write("0123456789");
+        var buf = [_]u8{0, 0, 0};
+        const m = try ring_reader.read(&buf);
+        try testing.expect(n == 7);
+        try testing.expect(m == 3);
+        try testing.expectEqualSlices(u8, &buf, "lo0");
+        try testing.expectEqualSlices(u8, &ring.buffer, "56llo01234");
+    }
+    {
+        var buf = [_]u8{0, 0, 0, 0, 0 ,0 ,0, 0, 0, 0};
+        const n = try ring_reader.read(&buf);
+        try testing.expect(n == 6);
+        try testing.expectEqualSlices(u8, buf[0..n], "123456");
+    }
 }
 
 fn ringRead(dest: []u8, src: []u8, head_ptr: *usize, tail: usize) usize {
@@ -163,7 +198,7 @@ test "ringRead - 5" {
     try testing.expect(n == 5);
 }
 
-fn ringWrite(src: []u8, dest: []u8, head_ptr: *usize, tail_ptr: *usize) usize {
+fn ringWrite(src: []const u8, dest: []u8, head_ptr: *usize, tail_ptr: *usize) usize {
     var tail = tail_ptr.*;
     const head = head_ptr.*;
     defer { tail_ptr.* = tail; }
@@ -261,7 +296,7 @@ test "ringWrite - 5" {
 }
 
 // copy copies maximum copyable bytes from src to dest.
-fn copy(dest: []u8, src: []u8) usize {
+fn copy(dest: []u8, src: []const u8) usize {
     var max_copyable = src.len;
     if (dest.len < max_copyable) {
         max_copyable = dest.len;
@@ -304,3 +339,28 @@ fn ringUnreadBytes(head: usize, tail: usize, len: usize) usize {
     }
     return len - head + tail;
 }
+
+fn ringReadConst(buffer: []u8, head_ptr: *usize, tail: usize) []const u8 {
+    var head = *head_ptr;
+    defer { head_ptr.* = head; }
+
+    if (tail > head) {
+        const view = buffer[head..tail];
+        head = tail;
+        return view;
+    }
+
+    const view = buffer[head..];
+    head = 0;
+    return view;
+}
+
+// fn ringReadFrom (
+//     comptime ReaderType: type,
+//     reader: ReaderType,
+//     buffer: []u8,
+//     &self.head,
+//     self.tail
+// ) usize {
+// 
+// }
