@@ -57,6 +57,10 @@ pub fn RingBuffer (
         pub fn unreadBytes(self: *Self) usize {
             return ringUnreadBytes(self.head, self.tail, self.buffer.len);
         }
+
+        pub fn isEmpty(self: *Self) bool {
+            return self.unreadBytes() == 0;
+        }
     };
 }
 
@@ -346,7 +350,7 @@ fn ringUnreadBytes(head: usize, tail: usize, len: usize) usize {
 }
 
 fn ringReadConst(buffer: []u8, head_ptr: *usize, tail: usize) []const u8 {
-    var head = *head_ptr;
+    var head = head_ptr.*;
     defer { head_ptr.* = head; }
 
     if (tail > head) {

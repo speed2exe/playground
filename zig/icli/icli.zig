@@ -1,16 +1,16 @@
 const std = @import("std");
 const array_list = @import("./array_list.zig");
 const linux = std.os.linux;
-const ring_buffer = @import("./ring_buffer.zig");
+const ring_buffered_reader = @import("./ring_buffered_reader.zig");
 const File = std.fs.File;
 
 pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
     return struct {
         const Self = @This();
-        const RingBuffer = ring_buffer.RingBuffer(comptime_settings.input_buffer_size, File.Reader);
+        const RingBufferedReader = ring_buffered_reader.RingBufferedReader(File.Reader, comptime_settings.input_buffer_size);
 
         tty: File,
-        input: RingBuffer,
+        input: RingBufferedReader,
         original_termios: std.os.termios,
         raw_mode_termios: std.os.termios,
         command_buffer: array_list.Array(u8),
@@ -22,7 +22,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             if (!tty.isTty()) {
                 return error.DeviceNotTty;
             }
-            var input = RingBuffer.init(tty.reader());
+            var input = RingBufferedReader.init(tty.reader());
 
             const original_termios = try std.os.tcgetattr(tty.handle);
             const raw_mode_termios = getRawModeTermios(original_termios);
@@ -115,27 +115,6 @@ pub const Settings = struct {
     prompt: []const u8 = "> ",
 };
 
-pub fn main() !void {
-    var tty = try std.fs.openFileAbsolute("/dev/tty", .{});
-    var original_termios = try std.os.tcgetattr(tty.handle);
-    var raw_mode_termios = getRawModeTermios(original_termios);
-    try setTermios(tty, raw_mode_termios);
-    defer setTermios(tty, original_termios) catch |err| {
-        std.debug.print("unsetRaw failed, {}", .{err});
-    };
-
-    var buf: [1]u8 = undefined;
-    var tty_reader = tty.reader();
-    while (true) {
-        const byte = try tty_reader.readByte();
-        if (byte == 3) { // Ctrl-C
-            return;
-        }
-        buf[0] = byte;
-        std.debug.print("{s}, {d}\r\n", .{buf, buf});
-    }
-}
-
 // based on: https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
 // only works for linux
 // TODO: make this work for other platforms
@@ -159,3 +138,24 @@ fn setTermios(file: File, termios: std.os.termios) !void {
 
 // TODO: create output ring writer buffer
 // TODO: get terminal size
+
+pub fn main() !void {
+    var tty = try std.fs.openFileAbsolute("/dev/tty", .{});
+    var original_termios = try std.os.tcgetattr(tty.handle);
+    var raw_mode_termios = getRawModeTermios(original_termios);
+    try setTermios(tty, raw_mode_termios);
+    defer setTermios(tty, original_termios) catch |err| {
+        std.debug.print("unsetRaw failed, {}", .{err});
+    };
+
+    var buf: [1]u8 = undefined;
+    var tty_reader = tty.reader();
+    while (true) {
+        const byte = try tty_reader.readByte();
+        if (byte == 3) { // Ctrl-C
+            return;
+        }
+        buf[0] = byte;
+        std.debug.print("{s}, {d}\r\n", .{buf, buf});
+    }
+}
