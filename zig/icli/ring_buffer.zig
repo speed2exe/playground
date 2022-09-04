@@ -12,9 +12,9 @@ pub fn RingBuffer (
 
         buffer: [buffer_size]u8 = undefined,
 
-        // inclusive
+        // The index of the first byte in the buffer, inclusive
         head: usize = 0,
-        // exclusive
+        // The index of the last byte in the buffer, exclusive
         tail: usize = 0,
 
         pub const Reader = std.io.Reader(*Self, anyerror, read);
@@ -39,13 +39,20 @@ pub fn RingBuffer (
         }
 
         // contents that is read from reader will be put into the buffer
-        pub fn readFrom(self: *Self, comptime ReaderType: type, r: ReaderType) !usize {
+        pub fn readFrom(self: *Self, comptime ReaderType: type, r: ReaderType) ReaderType.Error!usize {
             return try ringReadFrom(ReaderType, r, &self.buffer, &self.head, &self.tail);
         }
 
         // writer will write as much contents as possible from the buffer
-        pub fn writeTo(self: *Self, comptime WriterType: type, w: WriterType) !usize {
+        pub fn writeTo(self: *Self, comptime WriterType: type, w: WriterType) WriterType.Error!usize {
             return try ringWriteTo(WriterType, w, &self.buffer, &self.head, self.tail);
+        }
+
+        pub fn isFull(self: *Self) bool {
+            if (self.tail > self.head) {
+                return self.tail - self.head == buffer_size;
+            }
+            return self.head - self.tail == 1;
         }
 
         // Get view of next set of input without copying.
@@ -371,7 +378,7 @@ fn ringReadFrom(
     buffer: []u8,
     head_ptr: *usize,
     tail_ptr: *usize,
-) !usize {
+) ReaderType.Error!usize {
     var tail = tail_ptr.*;
     const head = head_ptr.*;
     defer { tail_ptr.* = tail; }
@@ -414,7 +421,7 @@ fn ringWriteTo(
     buffer: []const u8,
     head_ptr: *usize,
     tail: usize
-) !usize {
+) WriterType.Error!usize {
     var head = head_ptr.*;
     if (tail == head) {
         return 0;

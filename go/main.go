@@ -1,41 +1,13 @@
 package main
 
-import (
-	"bufio"
-	"os"
-)
+func processLogs(logsString []string, threshold int32) []string {
 
-func main() {
-    b := bufio.NewReadWriter(os.Stdin)
-    atomic
-    if true {
+}
 
+func reverse(nums []int32) {
+    mid := len(nums) / 2
+    for i := 0; i < mid; i++ {
+        nums[i], nums[len(nums)-1-i] = nums[len(nums)-1-i], nums[i]
     }
 
-
-
-
-
-
-
 }
-
- 
-type myType struct {
-
-    a int
-}
-
-func (m *myType) f () {
-
-}
-
-type this_inter interface {
-    f()
-}
-
-type myType2 struct {
-    a int
-}
-
-func myFunc(a int, b string) {}
