@@ -12,7 +12,7 @@ pub fn RingBufferedReader(
     return struct {
         const Self = @This();
         pub const Error = ReaderType.Error;
-        pub const Reader = std.io.Reader(Self, Error, read);
+        pub const Reader = std.io.Reader(*Self, Error, read);
         pub const RingBuffer = ring_buffer.RingBuffer(buffer_size);
 
         src: ReaderType,
@@ -27,6 +27,10 @@ pub fn RingBufferedReader(
                 return USIZE_ZERO;
             }
             return self.buffer.read(dest);
+        }
+
+        pub fn reader(self: *Self) Reader {
+            return Reader { .context = self };
         }
 
         pub fn readConst(self: *Self) ![]const u8{

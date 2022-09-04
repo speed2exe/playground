@@ -2,15 +2,18 @@ const std = @import("std");
 const array_list = @import("./array_list.zig");
 const linux = std.os.linux;
 const ring_buffered_reader = @import("./ring_buffered_reader.zig");
+const ring_buffered_writer = @import("./ring_buffered_writer.zig");
 const File = std.fs.File;
 
 pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
     return struct {
         const Self = @This();
         const RingBufferedReader = ring_buffered_reader.RingBufferedReader(File.Reader, comptime_settings.input_buffer_size);
+        const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(File.Writer, comptime_settings.input_buffer_size);
 
         tty: File,
         input: RingBufferedReader,
+        output: RingBufferedWriter,
         original_termios: std.os.termios,
         raw_mode_termios: std.os.termios,
         command_buffer: array_list.Array(u8),
@@ -23,6 +26,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 return error.DeviceNotTty;
             }
             var input = RingBufferedReader.init(tty.reader());
+            var output = RingBufferedWriter.init(tty.writer());
 
             const original_termios = try std.os.tcgetattr(tty.handle);
             const raw_mode_termios = getRawModeTermios(original_termios);
@@ -30,6 +34,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             return Self {
                 .tty = tty,
                 .input = input,
+                .output = output,
                 .original_termios = original_termios,
                 .raw_mode_termios = raw_mode_termios,
                 .allocator = settings.allocator,
@@ -44,7 +49,9 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         pub fn run(self: *Self) !void {
             while (true) {
-                std.debug.print("\r\n", .{});
+                try std.fmt.format(self.output.writer(), "\r\n{s}", .{ self.settings.prompt });
+                _ = try self.output.flush();
+
                 try self.fillCommandBuffer();
                 if (self.settings.execute(self.command_buffer.getAll())){
                     return;
@@ -56,7 +63,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         fn fillCommandBuffer(self: *Self) !void {
             try self.setRawInputMode();
             defer self.setOriginalInputMode() catch |err| {
-                std.debug.print("unsetRaw failed, {}", .{err});
+                std.fmt.format(self.output.writer(), "Failed to set original input mode: {any}", .{ err }) catch unreachable; 
             };
 
             while (true) {

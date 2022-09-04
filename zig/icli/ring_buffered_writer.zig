@@ -9,7 +9,7 @@ pub fn RingBufferedWriter(
     return struct {
         const Self = @This();
         pub const Error = WriterType.Error;
-        pub const Writer = std.io.Writer(Self, Error, write);
+        pub const Writer = std.io.Writer(*Self, Error, write);
         pub const RingBuffer = ring_buffer.RingBuffer(buffer_size);
 
         dest: WriterType,
@@ -17,6 +17,10 @@ pub fn RingBufferedWriter(
 
         pub fn init(w: WriterType) Self {
             return Self { .dest = w };
+        }
+
+        pub fn writer(self: *Self) Writer {
+            return Writer { .context = self };
         }
 
         // blocks until all bytes are written
@@ -45,6 +49,7 @@ test "test RingBufferedWriter" {
 
     var ring_buffered_writer = RingBufferedWriter(RingBuffer5.Writer, 3).init(writer);
     {
+        const n = try ring_buffered_writer.write("0123456789");
         const m = try ring_buffered_writer.flush();
         try testing.expect(n == 10);
         try testing.expect(m == 1);
