@@ -21,7 +21,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         settings: Settings,
 
         pub fn init(settings: Settings) !Self {
-            var tty = try std.fs.openFileAbsolute("/dev/tty", .{});
+            var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .write = true });
             if (!tty.isTty()) {
                 return error.DeviceNotTty;
             }
