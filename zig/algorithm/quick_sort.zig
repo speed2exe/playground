@@ -166,19 +166,9 @@ fn partition(
     data: []T,
     less: fn(a: T, b: T) bool,
 ) usize {
-    // print("before partition: {d}\n",.{data});
-    // defer {
-    //     print("after partition: {d}\n",.{data});
-    // }
-
     var res_idx: usize = 0;
     for (data) |data_value, data_idx| {
-        // print("data_value: {d}, data_idx: {}\n", .{data_value, data_idx});
-
         if (less(data_value, pivot_value)) {
-            // print("{d} is less then {d}\n", .{data_value, pivot_value});
-            // put the data_value to the 
-
             const temp = data[res_idx];
             data[res_idx] = data[data_idx];
             data[data_idx] = temp;
@@ -189,16 +179,31 @@ fn partition(
     return res_idx;
 }
 
-fn becomeOneIfZeroBranchless(comptime T: type, x: T) T {
-    // works for unsigned integers
-    // overflow if x is bigger than max_value - 2
-    // created just for fun :)
+// TODO: test this
+fn getKthLargest(
+    comptime T: type,
+    data: []T,
+    k: usize,
+    less: fn(a: T, b: T) bool,
+) T {
+    if (data.len < 2) {
+        return data[0];
+    }
 
-    // 0 => 1
-    // 1 => 1
-    // 2 => 2
-    // 3 => 3
-    // 4 => 4
+    var pivot_idx = partition(T, data[0], data, less);
+    if (pivot_idx < 1) {
+        pivot_idx += 1;
+    }
 
-    return ((x + 2) / (x + 1)) - 1 + x;
+    if (pivot_idx == k) {
+        return data[pivot_idx];
+    }
+
+    if (pivot_idx > k) {
+        return getKthLargest(T, data[0..pivot_idx], k, less);
+    }
+
+    return getKthLargest(T, data[pivot_idx..], k - pivot_idx, less);
 }
+
+// TODO: add function to get random index
