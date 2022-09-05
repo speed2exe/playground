@@ -179,29 +179,32 @@ fn partition(
     return running_idx;
 }
 
-// TODO: test this
-fn getKthLargest(
+fn getKthLeast(
     comptime T: type,
-    data: []T,
+    elems: []T,
     k: usize,
     less: fn(a: T, b: T) bool,
 ) T {
-    if (data.len < 2) {
-        return data[0];
+    if (elems.len < 2) {
+        return elems[0];
     }
 
-    var pivot_idx = partition(T, data[0], data, less);
-    if (pivot_idx < 1) {
-        pivot_idx += 1;
-    }
-
+    const pivot_idx = partition(T, elems, less);
     if (pivot_idx == k) {
-        return data[pivot_idx];
+        return elems[pivot_idx];
     }
 
     if (pivot_idx > k) {
-        return getKthLargest(T, data[0..pivot_idx], k, less);
+        return getKthLeast(T, elems[0..pivot_idx], k, less);
     }
 
-    return getKthLargest(T, data[pivot_idx..], k - pivot_idx, less);
+    return getKthLeast(T, elems[pivot_idx..], k - pivot_idx, less);
+}
+
+test "test getKthBest" {
+    var elems = [_]u8{ 2, 4, 5, 7, 9, 3, 1, 6, 8, 0 };
+    const k = 3;
+
+    const kth_best = getKthLeast(u8, &elems, k, u8Less);
+    try testing.expectEqual(@as(u8, 3), kth_best);
 }
