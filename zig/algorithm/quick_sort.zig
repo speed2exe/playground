@@ -1,9 +1,15 @@
-// create sort algorithm for generic types
-// quick and merge
-
 const std = @import("std");
 const testing = std.testing;
-// const print = std.debug.print;
+
+
+var prng = std.rand.DefaultPrng.init(42);
+var rand = prng.random();
+
+// fetch a random usize in range [min, max)
+// including min excluding max
+fn getRandUsize(min: usize, max: usize) usize {
+    return rand.int(usize) % (max - min) + min;
+}
 
 test "benchmark quickSort 1-100" {
     // 1 to 100 random order
@@ -44,37 +50,38 @@ test "benchmark std.sort 1-100" {
     std.sort.sort(u8, &data, @as(u8, 0), u8LessWithContex);
 }
 
-test "quicksort benchmark 1000,000" {
-    var random = std.rand.Isaac64.init(0).random();
-    var data: [1000_000]u8 = undefined;
-    for (data) |*value| {
-        value.* = random.int(u8);
-    }
+// test "quicksort benchmark 1000,000" {
+//     // var random = std.rand.Isaac64.init(1).random();
+// 
+//     var data: [1000_000]u8 = undefined;
+//     for (data) |*value| {
+//         value.* = rand.int(u8);
+//     }
+// 
+//     const now = std.time.milliTimestamp();
+//     defer {
+//         const then = std.time.milliTimestamp();
+//         std.log.warn("quicksort milli sec: {d}",.{then - now});
+//     }
+// 
+//     quickSort(u8, &data, u8Less);
+// }
 
-    const now = std.time.milliTimestamp();
-    defer {
-        const then = std.time.milliTimestamp();
-        std.log.warn("quicksort milli sec: {d}",.{then - now});
-    }
-
-    quickSort(u8, &data, u8Less);
-}
-
-test "std.sort benchmark 1000,000" {
-    var random = std.rand.Isaac64.init(0).random();
-    var data: [1000_000]u8 = undefined;
-    for (data) |*value| {
-        value.* = random.int(u8);
-    }
-
-    const now = std.time.milliTimestamp();
-    defer {
-        const then = std.time.milliTimestamp();
-        std.log.warn("std.sort milli sec: {d}",.{then - now});
-    }
-
-    std.sort.sort(u8, &data, @as(u8, 0), u8LessWithContex);
-}
+// test "std.sort benchmark 1000,000" {
+//     var random = std.rand.Isaac64.init(0).random();
+//     var data: [1000_000]u8 = undefined;
+//     for (data) |*value| {
+//         value.* = random.int(u8);
+//     }
+// 
+//     const now = std.time.milliTimestamp();
+//     defer {
+//         const then = std.time.milliTimestamp();
+//         std.log.warn("std.sort milli sec: {d}",.{then - now});
+//     }
+// 
+//     std.sort.sort(u8, &data, @as(u8, 0), u8LessWithContex);
+// }
 
 test "quickSort u8" {
     var array = [_]u8{3,2,5,9,7,6,4, 10, 99, 77, 88,55, 44, 22, 33};
@@ -133,50 +140,43 @@ fn stringLessThan(a: []const u8, b: []const u8) bool {
 // good for small datasets
 pub fn quickSort (
     comptime T: type,
-    data: []T, // array to be sorted
+    elems: []T, // elements to be sorted
     less: fn(a: T, b: T) bool,
 ) void {
-    if (data.len < 2) { // no need to sort
+    if (elems.len < 2) { // no need to sort
         return;
     }
 
-    // pick a pivot and get the index
-    // use first elem, TODO: improve
-    var pivot_idx = partition(T, data[0], data, less);
-    // edge case where no partitioning happens
-    // pivot_idx = becomeOneIfZeroBranchless(usize, pivot_idx);
-    if (pivot_idx < 1) {
-        pivot_idx += 1;
-    }
+    var pivot_idx = partition(T, elems, less);
 
-    const left = data[0..pivot_idx];
-    // print("left: {d}\n",.{left});
-    const right = data[pivot_idx..];
-    // print("right: {d}\n",.{right});
-
+    const left = elems[0..pivot_idx];
     quickSort(T, left, less);
+
+    const right = elems[pivot_idx..];
     quickSort(T, right, less);
 }
 
-// returns the index that indicates the 
-// equal or greater than the pivot_value
+// Returns the index which is the index of the pivot after partitioning
+// all elements to the left of the pivot are less than the pivot
+// all elements to the right of the pivot are greater than the pivot
 fn partition(
     comptime T: type,
-    pivot_value: T,
-    data: []T,
+    elems: []T,
     less: fn(a: T, b: T) bool,
 ) usize {
-    var res_idx: usize = 0;
-    for (data) |data_value, data_idx| {
-        if (less(data_value, pivot_value)) {
-            const temp = data[res_idx];
-            data[res_idx] = data[data_idx];
-            data[data_idx] = temp;
-            res_idx += 1;
-        }
-    }   
+    const pivot_value = elems[getRandUsize(0, elems.len)];
 
-    return res_idx;
+    var running_idx: usize = 0;
+    for (elems) |elem_value, elem_idx| {
+        if (less(elem_value, pivot_value)) {
+            const temp = elems[running_idx];
+            elems[running_idx] = elem_value;
+            elems[elem_idx] = temp;
+            running_idx += 1;
+        }
+    }
+
+    return running_idx;
 }
 
 // TODO: test this
@@ -205,5 +205,3 @@ fn getKthLargest(
 
     return getKthLargest(T, data[pivot_idx..], k - pivot_idx, less);
 }
-
-// TODO: add function to get random index
