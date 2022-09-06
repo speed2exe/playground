@@ -30,16 +30,14 @@ fn findMedianSortedArray(arr1: []u64, arr2: []u64) u64 { // arr1: [2, 3, 5, 8], 
         const r_2 = if (pi2 == arr2.len) std.math.maxInt(u64) else arr2[pi2];
 
         if (l_1 > r_2) {
-            var steps = pi1;
-            if (steps > 1) { steps /= 2; }
+            var steps = std.math.max(1, pi1/2);
             pi1 -= steps;
             pi2 += steps;
             continue;
         }
 
         if (l_2 > r_1) {
-            var steps = (arr1.len - pi1);
-            if (steps > 1) { steps /= 2; }
+            var steps = std.math.max(1, (arr1.len - pi1)/2);
             pi1 += steps;
             pi2 -= steps;
             continue;
