@@ -24,25 +24,22 @@ pub fn FixedQueue (
         // returns null if the queue is full
         // returns pointer to the node if there is space
         // returned pointer can be used to delete the node
-        pub fn push(self: *Self, item: T) bool {
+        pub fn push(self: *Self, item: T) ?*Node(T) {
 
             // if the queue is full, return false
-            if (capacity == self.length) return false;
+            if (capacity == self.length) return null;
 
+            // use the next available slot in items as new node
             var new_node_ptr = &self.items[self.length];
             new_node_ptr.*.value = item;
 
             // get the tail linked list
             if (self.tail_ptr) | tail_ptr | {
-                // next index in self.items will be used to store the new node
+                // link tail with new node
                 new_node_ptr.*.left_ptr = tail_ptr;
-
-                // link tail with the new node
                 tail_ptr.*.right_ptr = new_node_ptr;
             } else {
-                // if there's no tail, list is empty
-                // set both head and tail to the new node
-                // insertion is completed
+                // no tail, so this is the first node
                 self.head_ptr = new_node_ptr;
             }
 
@@ -50,7 +47,7 @@ pub fn FixedQueue (
             self.tail_ptr = new_node_ptr;
 
             self.length += 1;
-            return true;
+            return new_node_ptr;
         }
 
         // remove and return the first item in the queue, if exists
@@ -97,20 +94,17 @@ pub fn FixedQueue (
             head_ptr.left_ptr = last_node_ptr.left_ptr;
             head_ptr.right_ptr = last_node_ptr.right_ptr;
 
+            // clean up the last_node_ptr
+            last_node_ptr.left_ptr = null;
+            last_node_ptr.right_ptr = null;
+
             // the elem becomes the new head
-            // if it is not the same node
+            // if it is not the same node as swapped
             if (right_ptr != last_node_ptr) {
                 self.head_ptr = right_ptr;
             }
 
             self.length -= 1;
-
-            // debugging
-            self.items[last_index].value = 999;
-            self.items[last_index].left_ptr = null;
-            self.items[last_index].right_ptr = null;
-
-
             return result;
         }
 
@@ -183,12 +177,13 @@ test "FixedQueue" {
     var queue = FixedQueue(u32, 5){};
     {
         try testing.expectEqual(@as(?u32, null), queue.pop());
-        try testing.expect(true == queue.push(10));
-        try testing.expect(true == queue.push(11));
-        try testing.expect(true == queue.push(12));
-        try testing.expect(true == queue.push(13));
-        try testing.expect(true == queue.push(14));
-        try testing.expect(false == queue.push(14));
+        try testing.expect(null != queue.push(10));
+        try testing.expect(null != queue.push(11));
+        try testing.expect(null != queue.push(12));
+        try testing.expect(null != queue.push(13));
+        try testing.expect(null != queue.push(14));
+        try testing.expect(null == queue.push(14));
+
 
         try testing.expectEqual(@as(?u32, 10), queue.pop() orelse unreachable);
         try testing.expectEqual(@as(?u32, 11), queue.pop() orelse unreachable);
@@ -203,20 +198,20 @@ test "FixedQueue" {
     var queue = FixedQueue(u32, 5){};
     _ = queue;
     {
-        try testing.expect(true == queue.push(10));
+        try testing.expect(null != queue.push(10));
         try testing.expectEqual(@as(?u32, 10), queue.pop() orelse unreachable);
 
-        try testing.expect(true == queue.push(11)); // 11
-        try testing.expect(true == queue.push(12)); // 11, 12
+        try testing.expect(null != queue.push(11)); // 11
+        try testing.expect(null != queue.push(12)); // 11, 12
         try testing.expectEqual(@as(?u32, 11), queue.pop() orelse unreachable); // 12
 
-        try testing.expect(true == queue.push(13)); // 12, 13
-        try testing.expect(true == queue.push(14)); // 12, 13, 14
-        try testing.expect(true == queue.push(15)); // 12, 13, 14, 15
+        try testing.expect(null != queue.push(13)); // 12, 13
+        try testing.expect(null != queue.push(14)); // 12, 13, 14
+        try testing.expect(null != queue.push(15)); // 12, 13, 14, 15
         try testing.expectEqual(@as(?u32, 12), queue.pop() orelse unreachable); // 15, 13, 14
         try testing.expectEqual(@as(?u32, 13), queue.pop() orelse unreachable); // 15, 13, 14
 
-        try testing.expect(true == queue.push(16)); // 12, 13, 14, 15
+        try testing.expect(null != queue.push(16)); // 12, 13, 14, 15
         try testing.expectEqual(@as(?u32, 14), queue.pop() orelse unreachable);
         try testing.expectEqual(@as(?u32, 15), queue.pop() orelse unreachable);
         try testing.expectEqual(@as(?u32, 16), queue.pop() orelse unreachable);
