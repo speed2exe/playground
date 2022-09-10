@@ -21,33 +21,33 @@ pub fn FixedQueue (
         // index right most node, if there is
         tail_ptr: ?*Node(T) = null,
 
-        // returns false if the queue is full
+        // returns null if the queue is full
+        // returns pointer to the node if there is space
+        // returned pointer can be used to delete the node
         pub fn push(self: *Self, item: T) bool {
 
             // if the queue is full, return false
             if (capacity == self.length) return false;
 
+            var new_node_ptr = &self.items[self.length];
+            new_node_ptr.*.value = item;
+
             // get the tail linked list
             if (self.tail_ptr) | tail_ptr | {
                 // next index in self.items will be used to store the new node
-                var new_node_ptr = &self.items[self.length];
-                new_node_ptr.*.value = item;
                 new_node_ptr.*.left_ptr = tail_ptr;
 
                 // link tail with the new node
                 tail_ptr.*.right_ptr = new_node_ptr;
-
-                // the new node becomes the new tail
-                self.tail_ptr = new_node_ptr;
             } else {
                 // if there's no tail, list is empty
                 // set both head and tail to the new node
                 // insertion is completed
-                var new_node_ptr = &self.items[self.length];
-                new_node_ptr.*.value = item;
                 self.head_ptr = new_node_ptr;
-                self.tail_ptr = new_node_ptr;
             }
+
+            // the new node becomes the new tail
+            self.tail_ptr = new_node_ptr;
 
             self.length += 1;
             return true;

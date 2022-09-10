@@ -6,6 +6,7 @@ pub fn best (
     better: fn(T, T) bool,
     data: []T,
 ) ?T {
+    std.ArrayList
     if (data.len ==  0) {
         return null;
     }
