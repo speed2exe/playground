@@ -94,6 +94,10 @@ pub fn FixedQueue (
                 self.head_ptr = node.right_ptr;
             }
 
+            // invalidates the node
+            node.left_ptr = null;
+            node.right_ptr = null;
+
             // quick removal of node
             // steps:
             // get the last node in the list
@@ -133,55 +137,8 @@ pub fn FixedQueue (
         // index must exist in this linked list as a valid node
         // calling remove or pop consecutively invalidates the index
         pub fn remove(self: *Self, index: usize) void {
-
-            // link the left and the right
             var n = &self.items[index];
-            if (n.left_ptr) | left_ptr | {
-                left_ptr.right_ptr = n.right_ptr;
-            }
-            if (n.right_ptr) | right_ptr | {
-                right_ptr.left_ptr = n.left_ptr;
-            }
-
-            // copy from last node
-            const last_index = self.length - 1;
-            var last_node_ptr = &self.items[last_index];
-            n.left_ptr = last_node_ptr.left_ptr;
-            n.right_ptr = last_node_ptr.right_ptr;
-            n.value = last_node_ptr.value;
-
-            if (k) self.debugPrint();
-
-            // update the left and right of the last_node
-            // so that they refer to the moved node
-            if (last_node_ptr.left_ptr) | last_left_ptr | {
-                last_left_ptr.right_ptr = n;
-            }
-            if (last_node_ptr.right_ptr) | last_right_ptr | {
-                last_right_ptr.left_ptr = n;
-            }
-
-            // if the tail is the last node, update the tail
-            if (self.tail_ptr) |tail_ptr| {
-                if (tail_ptr == last_node_ptr) {
-                    if (k) warn("removed node is a tail",.{});
-                    self.tail_ptr = n;
-                }
-            }
-
-            if (self.head_ptr) |head_ptr| {
-                if (head_ptr == last_node_ptr) {
-                    if (k) warn("removed node is a head",.{});
-                    self.head_ptr = n;
-                }
-            }
-            // if the head is the last node, update the head
-
-            // invalidates current node
-            last_node_ptr.left_ptr = null;  
-            last_node_ptr.right_ptr = null;
-
-            self.length -= 1;
+            self.removeNode(n);
         }
 
         fn debugPrint(self: Self) void {
@@ -279,43 +236,43 @@ test "FixedQueue - 1" {
     }
 }
 
-// test "FixedQueue - 2" {
-//     var queue = FixedQueue(u32, 5){};
-//     {
-//         try testing.expect(@as(usize, 0) == queue.push(10));
-//         try testing.expect(@as(usize, 1) == queue.push(11));
-//         try testing.expect(@as(usize, 2) == queue.push(12));
-// 
-//         queue.remove(1);
-//         try testing.expectEqual(@as(?u32, 10), queue.pop() orelse unreachable);
-//         try testing.expectEqual(@as(?u32, 12), queue.pop() orelse unreachable);
-//     }
-// }
-// 
-// test "FixedQueue - 2" {
-//     var queue = FixedQueue(u32, 5){};
-//     {
-//         try testing.expect(@as(usize, 0) == queue.push(10));
-//         try testing.expect(@as(usize, 1) == queue.push(11));
-//         try testing.expect(@as(usize, 2) == queue.push(12));
-// 
-//         queue.remove(2);
-//         try testing.expectEqual(@as(?u32, 10), queue.pop() orelse unreachable);
-//         try testing.expectEqual(@as(?u32, 11), queue.pop() orelse unreachable);
-//     }
-// }
-// 
-// test "FixedQueue - 3" {
-//     var queue = FixedQueue(u32, 5){};
-//     {
-//         try testing.expect(@as(usize, 0) == queue.push(10));
-//         try testing.expect(@as(usize, 1) == queue.push(11));
-//         try testing.expect(@as(usize, 2) == queue.push(12));
-// 
-//         k = true;
-//         queue.remove(0);
-// 
-//         try testing.expectEqual(@as(?u32, 11), queue.pop() orelse unreachable);
-//         try testing.expectEqual(@as(?u32, 12), queue.pop() orelse unreachable);
-//     }
-// }
+test "FixedQueue - 2" {
+    var queue = FixedQueue(u32, 5){};
+    {
+        try testing.expect(@as(usize, 0) == queue.push(10));
+        try testing.expect(@as(usize, 1) == queue.push(11));
+        try testing.expect(@as(usize, 2) == queue.push(12));
+
+        queue.remove(1);
+        try testing.expectEqual(@as(?u32, 10), queue.pop() orelse unreachable);
+        try testing.expectEqual(@as(?u32, 12), queue.pop() orelse unreachable);
+    }
+}
+
+ test "FixedQueue - 2" {
+     var queue = FixedQueue(u32, 5){};
+     {
+        try testing.expect(@as(usize, 0) == queue.push(10));
+        try testing.expect(@as(usize, 1) == queue.push(11));
+        try testing.expect(@as(usize, 2) == queue.push(12));
+        k = true;
+        queue.remove(2);
+        try testing.expectEqual(@as(?u32, 10), queue.pop() orelse unreachable);
+        try testing.expectEqual(@as(?u32, 11), queue.pop() orelse unreachable);
+     }
+ }
+ 
+test "FixedQueue - 3" {
+    var queue = FixedQueue(u32, 5){};
+    {
+        try testing.expect(@as(usize, 0) == queue.push(10));
+        try testing.expect(@as(usize, 1) == queue.push(11));
+        try testing.expect(@as(usize, 2) == queue.push(12));
+
+        k = true;
+        queue.remove(0);
+
+        try testing.expectEqual(@as(?u32, 11), queue.pop() orelse unreachable);
+        try testing.expectEqual(@as(?u32, 12), queue.pop() orelse unreachable);
+    }
+}
