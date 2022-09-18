@@ -1,4 +1,5 @@
 const std = @import("std");
+const atomic = std.atomic;
 const testing = std.testing;
 
 pub fn FixedQueue (
@@ -8,58 +9,22 @@ pub fn FixedQueue (
     return struct {
         const Self = @This();
 
-        // where all the actual values lies
-        items: [capacity]Node(T) = undefined,
+        // circular buffer to store all the elements
+        // extra space to denote end of circular queue
+        items: [capacity+1]Node(T) = undefined,
 
-        // current valid item count
-        length: usize = 0,
+        head_index: usize = 0,
 
-        // index of the left most node, if there is
-        head_index: ?usize = null,
+        length: atomic.Atomic(u32) = atomic.Atomic(u32).init(0),
 
-        // index right most node, if there is
-        tail_index: ?usize = null,
+        // blocks if queue is full
+        pub fn push(self: *Self, item: T) void {
+            self.waitForSpace();
+        }
 
-        // returns false if the queue is full
-        pub fn push(self: *Self, item: T) bool {
-
-            // if the queue is full, return false
-            if (capacity == self.length) return false;
-
-
-            // get the tail linked list
-            if (self.tail_index) | tail_index | {
-
-                // creates the new node
-                // adds the node to the list
-                // increase the length after the insertion
-                var new_node = Node(T) {
-                    .value = item,
-                    .self_index = self.length,
-                    .left_index = self.items[tail_index].self_index,
-                };
-                self.items[self.length] = new_node;
-
-                // link tail with the new node
-                self.items[tail_index].right_index = self.length;
-
-                // the new node becomes the new tail
-                self.tail_index = self.length;
-
-            } else {
-                // if there's no tail, list is empty
-                // set both head and tail to the new node
-                // insertion is completed and done
-                self.head_index = 0;
-                self.tail_index = 0;
-                self.items[self.length] = Node(T) {
-                    .value = item,
-                    .self_index = 0,
-                };
-            }
-
-            self.length += 1;
-            return true;
+        fn waitForSpace(self: Self) void {
+            std.Thread.Mutex
+            std.Thread.Futex.wait(self.length, capacity, null);
         }
 
         pub fn pop(self: *Self) ?T {
@@ -136,3 +101,26 @@ test "FixedQueue" {
     }
 }
 
+// test "FixedQueue - 1" {
+//     var queue = FixedQueue(u32, 5){};
+//     {
+//         try testing.expect(null != queue.push(10));
+//         try testing.expectEqual(@as(?u32, 10), queue.pop() orelse unreachable);
+// 
+//         try testing.expect(null != queue.push(11)); // 11
+//         try testing.expect(null != queue.push(12)); // 11, 12
+//         try testing.expectEqual(@as(?u32, 11), queue.pop() orelse unreachable); // 12
+// 
+//         try testing.expect(null != queue.push(13)); // 12, 13
+//         try testing.expect(null != queue.push(14)); // 12, 13, 14
+//         try testing.expect(null != queue.push(15)); // 12, 13, 14, 15
+//         try testing.expectEqual(@as(?u32, 12), queue.pop() orelse unreachable); // 15, 13, 14
+//         try testing.expectEqual(@as(?u32, 13), queue.pop() orelse unreachable); // 15, 13, 14
+// 
+//         try testing.expect(null != queue.push(16)); // 12, 13, 14, 15
+//         try testing.expectEqual(@as(?u32, 14), queue.pop() orelse unreachable);
+//         try testing.expectEqual(@as(?u32, 15), queue.pop() orelse unreachable);
+//         try testing.expectEqual(@as(?u32, 16), queue.pop() orelse unreachable);
+//         try testing.expectEqual(@as(?u32, null), queue.pop());
+//     }
+// }

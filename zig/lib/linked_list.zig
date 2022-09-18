@@ -1,3 +1,7 @@
+// Should not use!
+// take this as learning example of
+// failed attempt to write a fixed double linked list
+
 const std = @import("std");
 const testing = std.testing;
 const warn = std.log.warn;

@@ -6,7 +6,6 @@ pub fn LRUCache (
 ) LRUCache {
 
     const Self = @This();
-    list
 
     return struct {
         map: HashMapType

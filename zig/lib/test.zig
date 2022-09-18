@@ -5,13 +5,17 @@ pub fn main () !void {
     // var a = std.atomic.Atomic(u32).init(0);
     // try std.Thread.Futex.wait(&a, 0, 5_000_000_000);
 
-    var a: ?u32 = 8;
-    
-    if (a) |b| {
-        std.debug.print("a is not null: {}",.{b});
-    } else {
-        std.debug.print("a is null",.{});
-    }
+    // var a: ?u32 = 8;
+    // 
+    // if (a) |b| {
+    //     std.debug.print("a is not null: {}",.{b});
+    // } else {
+    //     std.debug.print("a is null",.{});
+    // }
+
+    // std.atomic.spinLoopHint
+    var a = std.atomic.Atomic(u32).init(0);
+    std.Thread.Futex.wait
 
 
 }
