@@ -6,7 +6,8 @@ const ring_buffered_writer = @import("./ring_buffered_writer.zig");
 const File = std.fs.File;
 const termios = switch (builtin.os.tag) {
     .linux => @import("./termios_linux.zig"),
-    else => error.UnsupportedOS,
+    // .windows => @import("./termios_windows.zig"), // TODO
+    else => @import("./termios_c.zig"),
 };
 
 pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
