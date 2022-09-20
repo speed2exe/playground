@@ -99,12 +99,12 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
             while (true) {
                 const input = try self.input.readConst();
-                for (input) |byte| {
-                    const handled = try self.handleKeyBind(byte);
-                    if (handled) {
-                        continue;
-                    }
+                const handled = try self.handleKeyBind(input);
+                if (handled) {
+                    continue;
+                }
 
+                for (input) |byte| {
                     if (isEnd(byte)) {
                         _ = try self.output.write("\r\n");
                         return input_buffer.getAll();
@@ -120,21 +120,26 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             }
         }
 
-        fn handleKeyBind(self: *Self, byte: u8) !bool {
-            if (byte == 3) { // ctrl-c
+        // TODO: hash table
+        fn handleKeyBind(self: *Self, bytes: []const u8) !bool {
+            if (std.mem.eql(u8, bytes, &[_]u8{3})) { // ctrl-c
                 return error.Cancel;
+            } else if (std.mem.eql(u8, bytes, &[_]u8{4})) { // ctrl-d
+                return error.Quit;
+            } else if (std.mem.eql(u8, bytes, "\x1b[A")) { // up arrow
+                try self.printf("got up arrow",.{});
+                return true;
+            } else if (std.mem.eql(u8, bytes, "\x1b[B")) { // down arrow
+                try self.printf("got the down arrow",.{});
+                return true;
             }
-            // if (byte == 4) { // ctrl-d
-            //     return error.Cancel;
-            // }
+
 
             // TODO: handle other keybinds
-            _ = self;
             // return false to skip appending key to input buffer
 
             return false;
         }
-
 
         fn setRawInputMode(self: *Self) !void {
             try termios.setTermios(self.tty, self.raw_mode_termios);
@@ -142,6 +147,11 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         fn setOriginalInputMode(self: *Self) !void {
             try termios.setTermios(self.tty, self.original_termios);
+        }
+
+        fn printf(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+            std.fmt.format(self.output.writer(), fmt, args) catch unreachable;
+            _ = try self.output.flush();
         }
     };
 }
