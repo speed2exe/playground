@@ -11,15 +11,16 @@ pub fn FixedDoublyLinkedList (
 ) type {
     return struct {
         const Self = @This();
+        const Node = NodeOf(T);
 
         // private
-        nodes: [capacity]Node(T) = undefined,
+        nodes: [capacity]Node = undefined,
 
         length: usize = 0,
-        head: ?*Node(T) = null,
-        tail: ?*Node(T) = null,
+        head: ?*Node = null,
+        tail: ?*Node = null,
 
-        pub fn insertFront(self: *Self, item: T) ?*Node(T) {
+        pub fn insertFront(self: *Self, item: T) ?*Node {
             if (capacity == self.length) return null;
 
             var new_node = &self.nodes[self.length];
@@ -39,7 +40,7 @@ pub fn FixedDoublyLinkedList (
             return new_node;
         }
 
-        pub fn insertBack(self: *Self, item: T) ?*Node(T) {
+        pub fn insertBack(self: *Self, item: T) ?*Node {
             if (capacity == self.length) return null;
 
             var new_node = &self.nodes[self.length];
@@ -61,7 +62,7 @@ pub fn FixedDoublyLinkedList (
 
         /// WARNING: after removal of any node, all pointers to nodes after the
         /// removed node are invalidated
-        pub fn remove(self: *Self, node: *Node(T)) void {
+        pub fn remove(self: *Self, node: *Node) void {
             if (node == self.tail) {
                 self.tail = node.*.prev;
             } else {
@@ -130,7 +131,7 @@ pub fn FixedDoublyLinkedList (
     };
 }
 
-fn Node(comptime T: type) type {
+fn NodeOf(comptime T: type) type {
     return struct {
         const Self = @This();
 

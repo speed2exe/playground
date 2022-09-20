@@ -18,14 +18,17 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, comptime_settings.input_buffer_size);
         const HistoryType = fdll.FixedDoublyLinkedList(array_list.Array(u8), comptime_settings.history_size);
 
-        tty: File,
-        input: RingBufferedReader,
-        output: RingBufferedWriter,
-        history: HistoryType,
+        // variables that are pretty much unchanged once initialized
         original_termios: std.os.termios,
         raw_mode_termios: std.os.termios,
         allocator: std.mem.Allocator,
         settings: Settings,
+        tty: File,
+
+        // variables that are changed as the program runs
+        input: RingBufferedReader,
+        output: RingBufferedWriter,
+        history: HistoryType,
 
         pub fn init(settings: Settings) !Self {
             var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .write = true });
@@ -61,8 +64,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         pub fn run(self: *Self) !void {
             while (true) {
                 // prompt user
-                try std.fmt.format(self.output.writer(), "\r\n{s}", .{self.settings.prompt});
-                _ = try self.output.flush();
+                try self.printf("\r\n{s}", .{self.settings.prompt});
 
                 // get input
                 const input = try self.readUserInput();
@@ -76,7 +78,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         fn readUserInput(self: *Self) ![]const u8 {
             try self.setRawInputMode();
             defer self.setOriginalInputMode() catch |err| {
-                std.fmt.format(self.output.writer(), "Failed to set original input mode: {any}", .{err}) catch unreachable;
+                self.printf("Failed to set original input mode: {any}", .{err})
+                    catch unreachable;
             };
 
             // select a node from history list
@@ -85,9 +88,11 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 if (self.history.length == comptime_settings.history_size) {
                     const node = self.history.head orelse unreachable;
                     self.history.remove(node);
-                    break :blk self.history.insertFront(node.*.value) orelse unreachable;
+                    break :blk self.history.insertFront(node.*.value)
+                        orelse unreachable;
                 }
-                break :blk self.history.insertFront(array_list.Array(u8).init(self.settings.allocator)) orelse unreachable;
+                break :blk self.history.insertFront(array_list.Array(u8).init(self.settings.allocator))
+                    orelse unreachable;
             };
             var input_buffer = &history_node.*.value;
             input_buffer.truncate(0);
@@ -116,13 +121,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         // TODO: hash table
+        // return true if handled, input will not be added to the input_buffer
         fn handleKeyBind(self: *Self, bytes: []const u8) !bool {
             if (std.mem.eql(u8, bytes, &[_]u8{3})) { // ctrl-c
                 return error.Cancel;
             } else if (std.mem.eql(u8, bytes, &[_]u8{4})) { // ctrl-d
                 return error.Quit;
             } else if (std.mem.eql(u8, bytes, "\x1b[A")) { // up arrow
-                try self.printf("got up arrow",.{});
+                try self.selectPreviousHistory();
                 return true;
             } else if (std.mem.eql(u8, bytes, "\x1b[B")) { // down arrow
                 try self.printf("got the down arrow",.{});
@@ -136,14 +142,17 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             return false;
         }
 
-        fn selectPreviousHistory(self: *Self) void {
-            _ = self;
-            
+        fn selectPreviousHistory(self: *Self) !void {
+            try self.printf("selecting previous history",.{});
         }
 
         // fn selectNextHistory(self: *Self) void {
 
         // }
+
+        fn reDraw(self: *Self) void {
+            _ = self;
+        }
 
         fn setRawInputMode(self: *Self) !void {
             try termios.setTermios(self.tty, self.raw_mode_termios);
