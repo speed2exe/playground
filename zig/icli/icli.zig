@@ -79,23 +79,18 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 std.fmt.format(self.output.writer(), "Failed to set original input mode: {any}", .{err}) catch unreachable;
             };
 
-            // reused input buffer from history when possible
-            var input_buffer = blk: {
+            // select a node from history list
+            // if empty, create a new node
+            var history_node = blk: {
                 if (self.history.length == comptime_settings.history_size) {
-                    var buffer = blk2: {
-                        const node = self.history.head orelse unreachable;
-                        self.history.remove(node);
-                        const new_node = self.history.insertFront(node.*.value) orelse unreachable;
-                        break :blk2 &new_node.*.value;
-                    };
-                    buffer.truncate(0);
-                    break :blk buffer;
+                    const node = self.history.head orelse unreachable;
+                    self.history.remove(node);
+                    break :blk self.history.insertFront(node.*.value) orelse unreachable;
                 }
-
-                const new_node = self.history.insertFront(array_list.Array(u8).init(self.settings.allocator)) orelse unreachable;
-                break :blk &new_node.*.value;
+                break :blk self.history.insertFront(array_list.Array(u8).init(self.settings.allocator)) orelse unreachable;
             };
-
+            var input_buffer = &history_node.*.value;
+            input_buffer.truncate(0);
 
             while (true) {
                 const input = try self.input.readConst();
@@ -140,6 +135,15 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
             return false;
         }
+
+        fn selectPreviousHistory(self: *Self) void {
+            _ = self;
+            
+        }
+
+        // fn selectNextHistory(self: *Self) void {
+
+        // }
 
         fn setRawInputMode(self: *Self) !void {
             try termios.setTermios(self.tty, self.raw_mode_termios);
