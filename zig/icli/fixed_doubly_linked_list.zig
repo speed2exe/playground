@@ -10,12 +10,14 @@ pub fn FixedDoublyLinkedList (
     comptime capacity: usize,
 ) type {
     return struct {
+        pub const Node = NodeOf(T);
+
         const Self = @This();
-        const Node = NodeOf(T);
 
         // private
         nodes: [capacity]Node = undefined,
 
+        // public
         length: usize = 0,
         head: ?*Node = null,
         tail: ?*Node = null,

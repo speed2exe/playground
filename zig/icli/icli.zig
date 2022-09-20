@@ -16,7 +16,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         const Self = @This();
         const RingBufferedReader = ring_buffered_reader.RingBufferedReader(std.fs.File.Reader, comptime_settings.input_buffer_size);
         const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, comptime_settings.input_buffer_size);
-        const HistoryType = fdll.FixedDoublyLinkedList(array_list.Array(u8), comptime_settings.history_size);
+        const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), comptime_settings.history_size);
 
         // variables that are pretty much unchanged once initialized
         original_termios: std.os.termios,
@@ -28,7 +28,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         // variables that are changed as the program runs
         input: RingBufferedReader,
         output: RingBufferedWriter,
-        history: HistoryType,
+        history: History,
+        history_node: *History.Node,
 
         pub fn init(settings: Settings) !Self {
             var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .write = true });
@@ -45,11 +46,12 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 .tty = tty,
                 .input = input,
                 .output = output,
-                .history = HistoryType{},
+                .history = History{},
                 .original_termios = original_termios,
                 .raw_mode_termios = raw_mode_termios,
                 .allocator = settings.allocator,
                 .settings = settings,
+                .history_node = undefined,
             };
         }
 
@@ -63,16 +65,18 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         pub fn run(self: *Self) !void {
             while (true) {
-                // prompt user
-                try self.printf("\r\n{s}", .{self.settings.prompt});
-
-                // get input
+                try self.printPrompt();
                 const input = try self.readUserInput();
                 _ = try self.output.flush();
                 if (self.settings.execute(input)) {
                     return;
                 }
             }
+        }
+
+        fn printPrompt(self: *Self) !void {
+            // TODO: might add dynamic prompt later
+            try self.printf("\r\n{s}", .{self.settings.prompt});
         }
 
         fn readUserInput(self: *Self) ![]const u8 {
@@ -84,7 +88,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
             // select a node from history list
             // if empty, create a new node
-            var history_node = blk: {
+            self.history_node = blk: {
                 if (self.history.length == comptime_settings.history_size) {
                     const node = self.history.head orelse unreachable;
                     self.history.remove(node);
@@ -94,7 +98,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 break :blk self.history.insertFront(array_list.Array(u8).init(self.settings.allocator))
                     orelse unreachable;
             };
-            var input_buffer = &history_node.*.value;
+            var input_buffer = &self.history_node.*.value;
             input_buffer.truncate(0);
 
             while (true) {
@@ -143,12 +147,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         fn selectPreviousHistory(self: *Self) !void {
-            try self.printf("selecting previous history",.{});
+            self.history_node = self.history_node.prev orelse return;
+            self.reDraw();
         }
 
-        // fn selectNextHistory(self: *Self) void {
-
-        // }
+        fn selectNextHistory(self: *Self) void {
+            self.history_node = self.history_node.prev orelse return;
+            self.reDraw();
+        }
 
         fn reDraw(self: *Self) void {
             _ = self;
