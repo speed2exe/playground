@@ -10,49 +10,54 @@ pub fn FixedDoublyLinkedList (
     comptime capacity: usize,
 ) type {
     return struct {
+        pub const Node = NodeOf(T);
+
         const Self = @This();
 
         // private
-        nodes: [capacity]Node(T) = undefined,
+        nodes: [capacity]Node = undefined,
 
+        // public
         length: usize = 0,
-        head: ?*Node(T) = null,
-        tail: ?*Node(T) = null,
+        head: ?*Node = null,
+        tail: ?*Node = null,
 
-        pub fn insertFront(self: *Self, item: T) ?*Node(T) {
+        pub fn insertHead(self: *Self, item: T) ?*Node {
             if (capacity == self.length) return null;
 
             var new_node = &self.nodes[self.length];
             self.length += 1;
 
-            new_node.*.value = item;
-            new_node.*.prev = null;
+            new_node.value = item;
+            new_node.prev = null;
 
             if (self.head) |head| {
-                new_node.*.next = head;
-                head.*.prev = new_node;
+                new_node.next = head;
+                head.prev = new_node;
                 self.head = new_node;
             } else {
+                new_node.next = null;
                 self.head = new_node;
                 self.tail = new_node;
             }
             return new_node;
         }
 
-        pub fn insertBack(self: *Self, item: T) ?*Node(T) {
+        pub fn insertTail(self: *Self, item: T) ?*Node {
             if (capacity == self.length) return null;
 
             var new_node = &self.nodes[self.length];
             self.length += 1;
 
-            new_node.*.value = item;
-            new_node.*.next = null;
+            new_node.value = item;
+            new_node.next = null;
 
             if (self.tail) |tail| {
-                new_node.*.prev = tail;
-                tail.*.next = new_node;
+                new_node.prev = tail;
+                tail.next = new_node;
                 self.tail = new_node;
             } else {
+                new_node.prev = null;
                 self.head = new_node;
                 self.tail = new_node;
             }
@@ -61,17 +66,17 @@ pub fn FixedDoublyLinkedList (
 
         /// WARNING: after removal of any node, all pointers to nodes after the
         /// removed node are invalidated
-        pub fn remove(self: *Self, node: *Node(T)) void {
+        pub fn remove(self: *Self, node: *Node) void {
             if (node == self.tail) {
-                self.tail = node.*.prev;
+                self.tail = node.prev;
             } else {
-                node.*.next.?.prev = node.*.prev;
+                node.next.?.prev = node.prev;
             }
 
             if (node == self.head) {
-                self.head = node.*.next;
+                self.head = node.next;
             } else {
-                node.*.prev.?.next = node.*.next;
+                node.prev.?.next = node.next;
             }
 
             {
@@ -83,8 +88,8 @@ pub fn FixedDoublyLinkedList (
                 node.prev = last_node.prev;
             }
 
-            if (node.next) |next| { next.*.prev = node; }
-            if (node.prev) |prev| { prev.*.next = node; }
+            if (node.next) |next| { next.prev = node; }
+            if (node.prev) |prev| { prev.next = node; }
 
             self.length -= 1;
         }
@@ -130,7 +135,7 @@ pub fn FixedDoublyLinkedList (
     };
 }
 
-fn Node(comptime T: type) type {
+fn NodeOf(comptime T: type) type {
     return struct {
         const Self = @This();
 
@@ -162,22 +167,22 @@ test "test FixedDoublyLinkedList_1" {
     var buffer: [4]u8 = undefined;
 
     {
-        const node = fdll.insertBack(5) orelse unreachable;
-        try testing.expectEqual(node.*.value, @as(u8, 5));
+        const node = fdll.insertTail(5) orelse unreachable;
+        try testing.expectEqual(node.value, @as(u8, 5));
         const n = fdll.collectInternalValues(&buffer);
         try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{5});
     }
 
     {
-        const node = fdll.insertBack(6) orelse unreachable;
-        try testing.expectEqual(node.*.value, @as(u8, 6));
+        const node = fdll.insertTail(6) orelse unreachable;
+        try testing.expectEqual(node.value, @as(u8, 6));
         const n = fdll.collectInternalValues(&buffer);
         try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{5, 6});
     }
 
     {
-        const node = fdll.insertFront(4) orelse unreachable;
-        try testing.expectEqual(node.*.value, @as(u8, 4));
+        const node = fdll.insertHead(4) orelse unreachable;
+        try testing.expectEqual(node.value, @as(u8, 4));
         var n = fdll.collectInternalValues(&buffer);
         try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{5, 6, 4});
         n = fdll.collectInternalValuesLinked(&buffer);
@@ -185,8 +190,8 @@ test "test FixedDoublyLinkedList_1" {
     }
 
     {
-        const node = fdll.insertFront(7) orelse unreachable;
-        try testing.expectEqual(node.*.value, @as(u8, 7));
+        const node = fdll.insertHead(7) orelse unreachable;
+        try testing.expectEqual(node.value, @as(u8, 7));
         var n = fdll.collectInternalValues(&buffer);
         try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{5, 6, 4, 7});
         n = fdll.collectInternalValuesLinked(&buffer);
@@ -194,12 +199,12 @@ test "test FixedDoublyLinkedList_1" {
     }
 
     {
-        const node = fdll.insertFront(99);
+        const node = fdll.insertHead(99);
         try testing.expect(node == null);
     }
 
     {
-        const node = fdll.insertBack(99);
+        const node = fdll.insertTail(99);
         try testing.expect(node == null);
     }
 }
@@ -209,7 +214,7 @@ test "test FixedDoublyLinkedList_2" {
     var buffer: [2]u8 = undefined;
 
     {
-        const node = fdll.insertBack(5) orelse unreachable;
+        const node = fdll.insertTail(5) orelse unreachable;
         fdll.remove(node);
         const n = fdll.collectInternalValues(&buffer);
         try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{});
