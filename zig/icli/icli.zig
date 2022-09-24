@@ -70,6 +70,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const n = self.history.length;
             const valid_nodes = self.history.nodes[0..n];
             for (valid_nodes) |*node| {
+                // self.printf("data of node: {s}\n",.{node.value.elems}) catch unreachable;
                 node.value.deinit();
             }
         }
@@ -92,11 +93,26 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             }
 
             // TODO: fix this
-            // if (self.history_selected) |h| {
-            //     if (std.mem.eql(u8, h.value.elems, self.input_buffer.elems)) {
-            //         self.history.remove(h);
-            //     }
-            // }
+            if (self.history_selected) |h| {
+                if (std.mem.eql(u8, h.value.elems, self.input_buffer.elems)) {
+                    var n = self.history.length;
+                    var valid_nodes = self.history.nodes[0..n];
+                    for (valid_nodes) |*node| {
+                        self.printf("n: {s}\n", .{node.value.elems}) catch unreachable;
+                    }
+
+                    self.history.remove(h);
+                    _ = self.history.insertHead(h.value);
+
+                    n = self.history.length;
+                    valid_nodes = self.history.nodes[0..n];
+                    for (valid_nodes) |*node| {
+                        self.printf("n: {s}\n", .{node.value.elems}) catch unreachable;
+                    }
+
+                    return;
+                }
+            }
 
             if (self.history.length < comptime_settings.history_size) {
                 _ = self.history.insertHead(self.input_buffer);

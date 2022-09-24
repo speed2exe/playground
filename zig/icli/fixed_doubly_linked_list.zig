@@ -79,19 +79,16 @@ pub fn FixedDoublyLinkedList (
                 node.prev.?.next = node.next;
             }
 
-            {
-                var last_node = &self.nodes[self.length - 1];
-                if (last_node == self.head) { self.head = node; }
-                if (last_node == self.tail) { self.tail = node; }
-                node.value = last_node.value;
-                node.next = last_node.next;
-                node.prev = last_node.prev;
-            }
+            var last_node = &self.nodes[self.length - 1];
+            self.length -= 1;
 
+            node.value = last_node.value;
+            node.next = last_node.next;
+            node.prev = last_node.prev;
             if (node.next) |next| { next.prev = node; }
             if (node.prev) |prev| { prev.next = node; }
-
-            self.length -= 1;
+            if (last_node == self.head) { self.head = node; }
+            if (last_node == self.tail) { self.tail = node; }
         }
 
         fn collectInternalValues(self: Self, dest: *[capacity]T) usize {
@@ -154,9 +151,9 @@ fn NodeOf(comptime T: type) type {
                 std.log.warn("\tPrev: null",.{});
             }
             if (self.next) |next| {
-                std.log.warn("\tnext: value: {}", .{next.value});
+                std.log.warn("\tNext: value: {}", .{next.value});
             } else {
-                std.log.warn("\tnext: null",.{});
+                std.log.warn("\tNext: null",.{});
             }
         }
     };
@@ -219,5 +216,49 @@ test "test FixedDoublyLinkedList_2" {
         const n = fdll.collectInternalValues(&buffer);
         try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{});
     }
+}
 
+test "test FixedDoublyLinkedList_3" {
+    var fdll = FixedDoublyLinkedList(u8, 4){};
+    var buffer: [4]u8 = undefined;
+
+    {
+        _ = fdll.insertTail(5) orelse unreachable;
+        _ = fdll.insertTail(6) orelse unreachable;
+        const tail = fdll.tail orelse unreachable;
+        fdll.remove(tail);
+        const n = fdll.collectInternalValues(&buffer);
+        try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{5});
+    }
+
+    {
+        _ = fdll.insertHead(6);
+        const n = fdll.collectInternalValues(&buffer);
+        try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{5, 6});
+    }
+
+    // TODO: failed test case! do this first!
+    // {
+    //     const n = fdll.collectInternalValuesLinked(&buffer);
+    //     try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{6, 5});
+    // }
+}
+
+test "test FixedDoublyLinkedList_3" {
+    var fdll = FixedDoublyLinkedList(u8, 4){};
+    var buffer: [4]u8 = undefined;
+
+    {
+        _ = fdll.insertTail(5) orelse unreachable;
+        const r = fdll.insertTail(6) orelse unreachable;
+        _ = fdll.insertTail(7) orelse unreachable;
+
+        fdll.remove(r);
+
+        const n = fdll.collectInternalValues(&buffer);
+        try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{5, 7});
+
+        const m = fdll.collectInternalValuesLinked(&buffer);
+        try testing.expectEqualSlices(u8, buffer[0..m], &[_]u8{5, 7});
+    }
 }
