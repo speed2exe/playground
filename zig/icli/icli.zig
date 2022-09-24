@@ -29,7 +29,9 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         input: RingBufferedReader,
         output: RingBufferedWriter,
         history: History,
-        history_node: *History.Node,
+        history_selected: ?*History.Node, // current history node that user is using
+        input_buffer: array_list.Array(u8),
+        backup_buffer: array_list.Array(u8),
 
         pub fn init(settings: Settings) !Self {
             var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .write = true });
@@ -42,6 +44,10 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const original_termios = try std.os.tcgetattr(tty.handle);
             const raw_mode_termios = termios.getRawModeTermios(original_termios);
 
+            // nope, we don't want to do this, 
+            var input_buffer = array_list.Array(u8).init(settings.allocator);
+            var backup_buffer = array_list.Array(u8).init(settings.allocator);
+
             return Self {
                 .tty = tty,
                 .input = input,
@@ -51,11 +57,16 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 .raw_mode_termios = raw_mode_termios,
                 .allocator = settings.allocator,
                 .settings = settings,
-                .history_node = undefined,
+                .history_selected = null,
+                .input_buffer = input_buffer,
+                .backup_buffer = backup_buffer,
             };
         }
 
         pub fn deinit(self: *Self) void {
+            self.input_buffer.deinit();
+            self.backup_buffer.deinit();
+
             const n = self.history.length;
             const valid_nodes = self.history.nodes[0..n];
             for (valid_nodes) |*node| {
@@ -66,12 +77,40 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         pub fn run(self: *Self) !void {
             while (true) {
                 try self.printPrompt();
-                const input = try self.readUserInput();
-                _ = try self.output.flush();
-                if (self.settings.execute(input)) {
+
+                try self.readUserInput();
+                if (self.settings.execute(self.input_buffer.getAll())) {
                     return;
                 }
+                self.postExecution();
             }
+        }
+
+        fn postExecution(self: *Self) void {
+            if (comptime_settings.history_size == 0) {
+                return;
+            }
+
+            // TODO: fix this
+            // if (self.history_selected) |h| {
+            //     if (std.mem.eql(u8, h.value.elems, self.input_buffer.elems)) {
+            //         self.history.remove(h);
+            //     }
+            // }
+
+            if (self.history.length < comptime_settings.history_size) {
+                _ = self.history.insertHead(self.input_buffer);
+                self.input_buffer = array_list.Array(u8).init(self.settings.allocator);
+                return;
+            }
+
+            // swap the input buffer with the last node's in the history
+            // last node is kicked out and reinserted
+            const node = self.history.tail orelse unreachable;
+            self.history.remove(node);
+            const node_buffer = node.value;
+            _ = self.history.insertHead(self.input_buffer) orelse unreachable;
+            self.input_buffer = node_buffer;
         }
 
         fn printPrompt(self: *Self) !void {
@@ -79,27 +118,15 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             try self.printf("{s}", .{self.settings.prompt});
         }
 
-        fn readUserInput(self: *Self) ![]const u8 {
+        fn readUserInput(self: *Self) !void {
             try self.setRawInputMode();
             defer self.setOriginalInputMode() catch |err| {
                 self.printf("Failed to set original input mode: {any}", .{err})
                     catch unreachable;
             };
 
-            // select a node from history list
-            // if empty, create a new node
-            self.history_node = blk: {
-                if (self.history.length == comptime_settings.history_size) {
-                    const node = self.history.head orelse unreachable;
-                    self.history.remove(node);
-                    break :blk self.history.insertHead(node.*.value)
-                        orelse unreachable;
-                }
-                break :blk self.history.insertHead(array_list.Array(u8).init(self.settings.allocator))
-                    orelse unreachable;
-            };
-            var input_buffer = &self.history_node.*.value;
-            input_buffer.truncate(0);
+            self.input_buffer.truncate(0);
+            self.history_selected = null;
 
             while (true) {
                 const input = try self.input.readConst();
@@ -111,10 +138,11 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 for (input) |byte| {
                     if (isEnd(byte)) {
                         _ = try self.output.write("\r\n");
-                        return input_buffer.getAll();
+                        _ = try self.output.flush();
+                        return;
                     }
 
-                    try input_buffer.append(byte);
+                    try self.input_buffer.append(byte);
                     _ = try self.output.write(&[1]u8{byte});
 
                     // TODO: handle inputs after end
@@ -146,36 +174,57 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             return false;
         }
 
+        fn switchInputBuffer(self: *Self) void {
+            const tmp = self.input_buffer;
+            self.input_buffer = self.backup_buffer;
+            self.backup_buffer = tmp;
+        }
+
         fn selectLessRecent(self: *Self) !void {
-            const n = self.history_node.next;
-            if (n) |_|{
-                try self.printf("hello", .{});
-            } else {
-                try self.printf("no next", .{});
-            }
+            const history_selected = self.history_selected orelse {
+                // switch buffer
+                self.history_selected = self.history.head orelse return;
+                try self.printf("debug: 1",.{});
+                self.switchInputBuffer();
+                try self.setInputBufferContent(self.history_selected.?.value.elems);
+                try self.reDraw();
+                return;
+            };
 
-
-            self.history_node = self.history_node.next orelse return;
-
-            // try self.reDraw();
+            const less_recent_node = history_selected.next orelse return;
+            self.history_selected = less_recent_node;
+            try self.setInputBufferContent(less_recent_node.value.elems);
+            try self.reDraw();
         }
 
         fn selectMoreRecent(self: *Self) !void {
-            self.history_node = self.history_node.prev orelse return;
+            const history_selected = self.history_selected orelse return;
+            const more_recent_node = history_selected.prev orelse {
+                self.history_selected = null;
+                self.switchInputBuffer();
+                try self.reDraw();
+                return;
+            };
+
+            self.history_selected = more_recent_node;
+            try self.setInputBufferContent(more_recent_node.value.elems);
             try self.reDraw();
+        }
+
+        fn setInputBufferContent(self: *Self, content: []u8) !void {
+            self.input_buffer.truncate(0);
+            try self.input_buffer.appendSlice(content);
         }
 
         fn reDraw(self: *Self) !void {
             // move cursor to the beginning of the line & clear the line
             try self.printf("\r\x1b[K", .{});
-
-            // print the prompt
             try self.printPrompt();
-            try self.printCurrentHistory();
+            try self.printInputBuffer();
         }
 
-        fn printCurrentHistory(self: *Self) !void {
-            try self.printf("{s}", .{self.history_node.value.elems});
+        fn printInputBuffer(self: *Self) !void {
+            try self.printf("{s}", .{self.input_buffer.elems});
         }
 
         fn setRawInputMode(self: *Self) !void {

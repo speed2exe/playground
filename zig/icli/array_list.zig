@@ -33,8 +33,14 @@ pub fn Array(comptime T: type) type {
             self.elems[self.len - 1] = elem;
         }
 
+        pub fn appendSlice(self: *Self, slice: []T) !void {
+            const new_len = self.len + slice.len;
+            try self.ensureCapacity(new_len);
+            std.mem.copy(T, self.elems[self.len..], slice);
+            self.len = new_len;
+        }
+
         // TODO:
-        // append slice
         // sort
         // forEach? allocation?
         // map? allocation?
@@ -142,6 +148,12 @@ test "Array" {
     try array.removeAtIndex(1);
     try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{6});
 
+    {
+        // append slice
+        var slice = [_]i8{1, 2, 3, 5, 6, 7, 8, 9, 10};
+        try array.appendSlice(&slice);
+        try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{6, 1, 2, 3, 5, 6, 7, 8, 9, 10});
+    }
 }
 
 fn i8Less(a: i8, b: i8) bool {
