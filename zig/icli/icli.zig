@@ -76,7 +76,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         fn printPrompt(self: *Self) !void {
             // TODO: might add dynamic prompt later
-            try self.printf("\r\n{s}", .{self.settings.prompt});
+            try self.printf("{s}", .{self.settings.prompt});
         }
 
         fn readUserInput(self: *Self) ![]const u8 {
@@ -92,10 +92,10 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 if (self.history.length == comptime_settings.history_size) {
                     const node = self.history.head orelse unreachable;
                     self.history.remove(node);
-                    break :blk self.history.insertFront(node.*.value)
+                    break :blk self.history.insertHead(node.*.value)
                         orelse unreachable;
                 }
-                break :blk self.history.insertFront(array_list.Array(u8).init(self.settings.allocator))
+                break :blk self.history.insertHead(array_list.Array(u8).init(self.settings.allocator))
                     orelse unreachable;
             };
             var input_buffer = &self.history_node.*.value;
@@ -132,10 +132,10 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             } else if (std.mem.eql(u8, bytes, &[_]u8{4})) { // ctrl-d
                 return error.Quit;
             } else if (std.mem.eql(u8, bytes, "\x1b[A")) { // up arrow
-                try self.selectPreviousHistory();
+                try self.selectLessRecent();
                 return true;
             } else if (std.mem.eql(u8, bytes, "\x1b[B")) { // down arrow
-                try self.printf("got the down arrow",.{});
+                try self.selectMoreRecent();
                 return true;
             }
 
@@ -146,18 +146,36 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             return false;
         }
 
-        fn selectPreviousHistory(self: *Self) !void {
-            self.history_node = self.history_node.prev orelse return;
-            self.reDraw();
+        fn selectLessRecent(self: *Self) !void {
+            const n = self.history_node.next;
+            if (n) |_|{
+                try self.printf("hello", .{});
+            } else {
+                try self.printf("no next", .{});
+            }
+
+
+            self.history_node = self.history_node.next orelse return;
+
+            // try self.reDraw();
         }
 
-        fn selectNextHistory(self: *Self) void {
+        fn selectMoreRecent(self: *Self) !void {
             self.history_node = self.history_node.prev orelse return;
-            self.reDraw();
+            try self.reDraw();
         }
 
-        fn reDraw(self: *Self) void {
-            _ = self;
+        fn reDraw(self: *Self) !void {
+            // move cursor to the beginning of the line & clear the line
+            try self.printf("\r\x1b[K", .{});
+
+            // print the prompt
+            try self.printPrompt();
+            try self.printCurrentHistory();
+        }
+
+        fn printCurrentHistory(self: *Self) !void {
+            try self.printf("{s}", .{self.history_node.value.elems});
         }
 
         fn setRawInputMode(self: *Self) !void {
@@ -217,3 +235,4 @@ fn isEnd(byte: u8) bool {
 
 // TODO: get terminal size
 // TODO: support utf-8 input?
+// TODO: log to file
