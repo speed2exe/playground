@@ -82,6 +82,10 @@ pub fn FixedDoublyLinkedList (
             var last_node = &self.nodes[self.length - 1];
             self.length -= 1;
 
+            if (node == last_node) {
+                return;
+            }
+
             node.value = last_node.value;
             node.next = last_node.next;
             node.prev = last_node.prev;
@@ -238,10 +242,10 @@ test "test FixedDoublyLinkedList_3" {
     }
 
     // TODO: failed test case! do this first!
-    // {
-    //     const n = fdll.collectInternalValuesLinked(&buffer);
-    //     try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{6, 5});
-    // }
+    {
+        const n = fdll.collectInternalValuesLinked(&buffer);
+        try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{6, 5});
+    }
 }
 
 test "test FixedDoublyLinkedList_3" {
