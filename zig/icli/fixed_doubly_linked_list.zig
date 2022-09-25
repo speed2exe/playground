@@ -241,7 +241,6 @@ test "test FixedDoublyLinkedList_3" {
         try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{5, 6});
     }
 
-    // TODO: failed test case! do this first!
     {
         const n = fdll.collectInternalValuesLinked(&buffer);
         try testing.expectEqualSlices(u8, buffer[0..n], &[_]u8{6, 5});
