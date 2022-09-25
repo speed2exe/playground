@@ -92,24 +92,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 return;
             }
 
-            // TODO: fix this
             if (self.history_selected) |h| {
                 if (std.mem.eql(u8, h.value.elems, self.input_buffer.elems)) {
-                    var n = self.history.length;
-                    var valid_nodes = self.history.nodes[0..n];
-                    for (valid_nodes) |*node| {
-                        self.printf("n: {s}\n", .{node.value.elems}) catch unreachable;
-                    }
+                    // h is invalidated after removal from self.history
+                    // hence we need to get the buffer before removal
+                    const history_buffer = h.value;
 
                     self.history.remove(h);
-                    _ = self.history.insertHead(h.value);
-
-                    n = self.history.length;
-                    valid_nodes = self.history.nodes[0..n];
-                    for (valid_nodes) |*node| {
-                        self.printf("n: {s}\n", .{node.value.elems}) catch unreachable;
-                    }
-
+                    _ = self.history.insertHead(history_buffer);
                     return;
                 }
             }
