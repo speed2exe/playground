@@ -154,7 +154,13 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             self.history_selected = null;
 
             while (true) {
+                defer {
+                    self.log_to_file("input_buffer: {s}\n", .{self.input_buffer.getAll()}) catch unreachable;
+                    self.log_to_file("post_cursor_buffer: {s}\n", .{self.post_cursor_buffer[self.post_cursor_position..]}) catch unreachable;
+                }
+
                 const input = try self.input.readConst();
+                self.log_to_file("read: {s}, bytes: {d}\n", .{input, input}) catch unreachable;
                 const handled = try self.handleKeyBind(input);
                 if (handled) {
                     continue;
@@ -195,17 +201,23 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
                 const new_post_cursor_buffer = try self.allocator.alloc(u8, final_size);
                 const post_buffer_len = self.post_cursor_buffer.len - self.post_cursor_position;
-                std.mem.copy(u8, new_post_cursor_buffer[final_size - post_buffer_len..], self.post_cursor_buffer[self.post_cursor_position..]);  
+                const post_buffer_position = final_size - post_buffer_len;
+                std.mem.copy(u8, new_post_cursor_buffer[post_buffer_position..], self.post_cursor_buffer[self.post_cursor_position..]);
                 self.allocator.free(self.post_cursor_buffer);
                 self.post_cursor_buffer = new_post_cursor_buffer;
-                break :blk final_size - bytes.len;
+                break :blk post_buffer_position - bytes.len;
             };
             std.mem.copy(u8, self.post_cursor_buffer[final_post_buffer_cursor..], bytes);
             self.post_cursor_position = final_post_buffer_cursor;
         }
 
         fn writePostCursorBuffer(self: *Self) !void {
+            const to_move_left = self.post_cursor_buffer.len - self.post_cursor_position;
+            if (to_move_left == 0) {
+                return;
+            }
             _ = try self.output.write(self.post_cursor_buffer[self.post_cursor_position..]);
+            try self.printf("\x1b[{d}D", .{to_move_left});
         }
 
         // TODO: hash table
@@ -224,7 +236,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             } else if (std.mem.eql(u8, bytes, "\x1b[C")) { // right arrow
                 try self.moveCursorRight();
                 return true;
-            } else if (std.mem.eql(u8, bytes, "\x1b[D")) { // right arrow
+            } else if (std.mem.eql(u8, bytes, "\x1b[D")) { // left arrow
                 try self.moveCursorLeft();
                 return true;
             }
@@ -244,8 +256,6 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         fn moveCursorRight(self: *Self) !void {
             if (self.post_cursor_position == self.post_cursor_buffer.len) {
-                // try self.printf("self.post_cursor_position: {d}", .{self.post_cursor_position});
-                // try self.printf("self.post_cursor_buffer_len: {d}", .{self.post_cursor_buffer.len});
                 return;
             }
 
@@ -260,14 +270,10 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const tmp = self.input_buffer;
             self.input_buffer = self.backup_buffer;
             self.backup_buffer = tmp;
-
-            // TODO: preserve cursor position after switch back
-            self.post_cursor_position = self.post_cursor_buffer.len; 
         }
 
         fn selectLessRecent(self: *Self) !void {
             const history_selected = self.history_selected orelse {
-                // switch buffer
                 self.history_selected = self.history.head orelse return;
                 self.switchInputBuffer();
                 try self.setInputBufferContent(self.history_selected.?.value.elems);
@@ -296,6 +302,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         fn setInputBufferContent(self: *Self, content: []const u8) !void {
+            self.post_cursor_position = self.post_cursor_buffer.len;
             self.input_buffer.truncate(0);
             try self.input_buffer.appendSlice(content);
         }
@@ -320,8 +327,13 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         fn printf(self: *Self, comptime fmt: []const u8, args: anytype) !void {
-            std.fmt.format(self.output.writer(), fmt, args) catch unreachable;
+            try std.fmt.format(self.output.writer(), fmt, args);
             _ = try self.output.flush();
+        }
+
+        fn log_to_file(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+            if (comptime_settings.log_file_path == null) return;
+            try std.fmt.format(self.log_file.?.writer(), fmt, args);
         }
     };
 }
