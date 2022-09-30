@@ -18,7 +18,7 @@ pub fn main() void {
 }
 
 fn runApp(allocator: std.mem.Allocator) !void {
-    var cli = try icli.InteractiveCli(.{}).init(.{
+    var cli = try icli.InteractiveCli(.{ .log_file_path = "app.log" }).init(.{
         .allocator = allocator,
         .execute = execute,
     });

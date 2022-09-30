@@ -36,6 +36,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         post_cursor_buffer: []u8,
         post_cursor_position: usize,
 
+        log_file: ?File,
+
         pub fn init(settings: Settings) !Self {
             var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .write = true });
             if (!tty.isTty()) {
@@ -51,6 +53,12 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             var backup_buffer = array_list.Array(u8).init(settings.allocator);
             var post_cursor_buffer = &[_]u8{};
 
+            const log_file = blk: {
+                const log_path = comptime_settings.log_file_path orelse break :blk null;
+                const log_file = try std.fs.cwd().createFile(log_path, .{ .read = true });
+                break :blk log_file;
+            };
+
             return Self {
                 .tty = tty,
                 .input = input,
@@ -65,6 +73,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 .backup_buffer = backup_buffer,
                 .post_cursor_buffer = post_cursor_buffer,
                 .post_cursor_position = 0,
+                .log_file = log_file,
             };
         }
 
@@ -235,6 +244,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         fn moveCursorRight(self: *Self) !void {
             if (self.post_cursor_position == self.post_cursor_buffer.len) {
+                // try self.printf("self.post_cursor_position: {d}", .{self.post_cursor_position});
+                // try self.printf("self.post_cursor_buffer_len: {d}", .{self.post_cursor_buffer.len});
                 return;
             }
 
@@ -318,6 +329,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 pub const ComptimeSettings = struct {
     input_buffer_size: usize = 4096,
     history_size: usize = 100,
+    log_file_path: ?[]const u8 = null,
 };
 
 pub const Settings = struct {
