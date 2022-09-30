@@ -33,7 +33,7 @@ pub fn Array(comptime T: type) type {
             self.elems[self.len - 1] = elem;
         }
 
-        pub fn appendSlice(self: *Self, slice: []T) !void {
+        pub fn appendSlice(self: *Self, slice: []const T) !void {
             const new_len = self.len + slice.len;
             try self.ensureCapacity(new_len);
             std.mem.copy(T, self.elems[self.len..], slice);
