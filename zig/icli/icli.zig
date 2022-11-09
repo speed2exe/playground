@@ -5,6 +5,7 @@ const fdll = @import("./fixed_doubly_linked_list.zig");
 const ring_buffered_reader = @import("./ring_buffered_reader.zig");
 const ring_buffered_writer = @import("./ring_buffered_writer.zig");
 const File = std.fs.File;
+const OpenMode = std.fs.File.OpenMode;
 const termios = switch (builtin.os.tag) {
     .linux => @import("./termios_linux.zig"),
     // .windows => @import("./termios_windows.zig"), // TODO
@@ -39,7 +40,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         log_file: ?File,
 
         pub fn init(settings: Settings) !Self {
-            var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .write = true });
+            var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = OpenMode.read_write });
             if (!tty.isTty()) {
                 return error.DeviceNotTty;
             }
@@ -53,11 +54,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             var backup_buffer = array_list.Array(u8).init(settings.allocator);
             var post_cursor_buffer = &[_]u8{};
 
-            const log_file = blk: {
-                const log_path = comptime_settings.log_file_path orelse break :blk null;
-                const log_file = try std.fs.cwd().createFile(log_path, .{ .read = true });
-                break :blk log_file;
-            };
+            const log_file = null;
+            // const log_file = blk: {
+            //     const log_path = comptime_settings.log_file_path orelse break :blk null;
+            //     const log_file = try std.fs.cwd().createFile(log_path, .{
+            //         .mode = .write_only 
+            //      });
+            //     break :blk log_file;
+            // };
 
             return Self {
                 .tty = tty,
@@ -331,8 +335,9 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             _ = try self.output.flush();
         }
 
+        // TODO: eval funtion at comptime
         fn log_to_file(self: *Self, comptime fmt: []const u8, args: anytype) !void {
-            if (comptime_settings.log_file_path == null) return;
+            if (self.log_file == null) return;
             try std.fmt.format(self.log_file.?.writer(), fmt, args);
         }
     };
@@ -347,37 +352,14 @@ pub const ComptimeSettings = struct {
 pub const Settings = struct {
     welcome_message: []const u8 = "Welcome!",
     allocator: std.mem.Allocator,
-    execute: fn ([]const u8) bool,
-    suggest: ?fn ([]const u8, usize) [][]const u8 = null,
+    execute: *const fn ([]const u8) bool,
+    // suggest: ?*fn ([]const u8, usize) [][]const u8 = null,
     prompt: []const u8 = "> ",
 };
 
 fn isEnd(byte: u8) bool {
     return byte == '\r';
 }
-
-// pub fn main() !void {
-//     var tty = try std.fs.openFileAbsolute("/dev/tty", .{});
-//     var original_termios = try std.os.tcgetattr(tty.handle);
-//     var raw_mode_termios = getRawModeTermios(original_termios);
-//     try setTermios(tty, raw_mode_termios);
-//     defer setTermios(tty, original_termios) catch |err| {
-//         std.debug.print("unsetRaw failed, {}", .{err});
-//     };
-//
-//     var buf: [1]u8 = undefined;
-//     var tty_reader = tty.reader();
-//     while (true) {
-//         const byte = try tty_reader.readByte();
-//         if (byte == 3) { // Ctrl-C
-//             return;
-//         }
-//         buf[0] = byte;
-//         std.debug.print("{s}, {d}\r\n", .{buf, buf});
-//     }
-// }
-
-
 
 // TODO: get terminal size
 // TODO: support utf-8 input?

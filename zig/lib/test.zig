@@ -15,7 +15,11 @@ pub fn main () !void {
 
     // std.atomic.spinLoopHint
     var a = std.atomic.Atomic(u32).init(0);
-    std.Thread.Futex.wait
+    a.loadUnchecked()
 
 
+
+
+
+    // std.io.getStdIn().read
 }

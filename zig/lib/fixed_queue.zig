@@ -23,7 +23,6 @@ pub fn FixedQueue (
         }
 
         fn waitForSpace(self: Self) void {
-            std.Thread.Mutex
             std.Thread.Futex.wait(self.length, capacity, null);
         }
 
