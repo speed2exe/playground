@@ -335,10 +335,11 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             _ = try self.output.flush();
         }
 
-        // TODO: eval funtion at comptime
-        fn log_to_file(self: *Self, comptime fmt: []const u8, args: anytype) !void {
-            if (self.log_file == null) return;
-            try std.fmt.format(self.log_file.?.writer(), fmt, args);
+        // TODO: eval function at comptime
+        inline fn log_to_file(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+            if (self.log_file) |f| {
+                try std.fmt.format(f.writer(), fmt, args);
+            }
         }
     };
 }
@@ -364,3 +365,4 @@ fn isEnd(byte: u8) bool {
 // TODO: get terminal size
 // TODO: support utf-8 input?
 // TODO: log to file
+// TODO: handle tab character
