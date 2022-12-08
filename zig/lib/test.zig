@@ -14,12 +14,20 @@ pub fn main () !void {
     // }
 
     // std.atomic.spinLoopHint
-    var a = std.atomic.Atomic(u32).init(0);
-    a.loadUnchecked()
+    // var a = std.atomic.Atomic(u32).init(0);
+    // a.loadUnchecked()
+
+
+
+
 
 
 
 
 
     // std.io.getStdIn().read
+
+
 }
+
+
