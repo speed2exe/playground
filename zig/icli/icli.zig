@@ -4,6 +4,7 @@ const array_list = @import("./array_list.zig");
 const fdll = @import("./fixed_doubly_linked_list.zig");
 const ring_buffered_reader = @import("./ring_buffered_reader.zig");
 const ring_buffered_writer = @import("./ring_buffered_writer.zig");
+const defaults = @import("./defaults.zig");
 const File = std.fs.File;
 const OpenMode = std.fs.File.OpenMode;
 const termios = switch (builtin.os.tag) {
@@ -54,14 +55,12 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             var backup_buffer = array_list.Array(u8).init(settings.allocator);
             var post_cursor_buffer = &[_]u8{};
 
-            const log_file = null;
-            // const log_file = blk: {
-            //     const log_path = comptime_settings.log_file_path orelse break :blk null;
-            //     const log_file = try std.fs.cwd().createFile(log_path, .{
-            //         .mode = .write_only 
-            //      });
-            //     break :blk log_file;
-            // };
+            // const log_file = null;
+            const log_file = blk: {
+                const log_path = comptime_settings.log_file_path orelse break :blk null;
+                const log_file = try std.fs.cwd().createFile(log_path, .{});
+                break :blk log_file;
+            };
 
             return Self {
                 .tty = tty,
@@ -146,6 +145,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             try self.printf("{s}", .{self.settings.prompt});
         }
 
+        /// Read user input and store it in self.input_buffer
         fn readUserInput(self: *Self) !void {
             try self.setRawInputMode();
             defer self.setOriginalInputMode() catch |err| {
@@ -318,19 +318,19 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             try self.printInputBuffer();
         }
 
-        fn printInputBuffer(self: *Self) !void {
+        inline fn printInputBuffer(self: *Self) !void {
             try self.printf("{s}", .{self.input_buffer.elems});
         }
 
-        fn setRawInputMode(self: *Self) !void {
+        inline fn setRawInputMode(self: *Self) !void {
             try termios.setTermios(self.tty, self.raw_mode_termios);
         }
 
-        fn setOriginalInputMode(self: *Self) !void {
+        inline fn setOriginalInputMode(self: *Self) !void {
             try termios.setTermios(self.tty, self.original_termios);
         }
 
-        fn printf(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+        inline fn printf(self: *Self, comptime fmt: []const u8, args: anytype) !void {
             try std.fmt.format(self.output.writer(), fmt, args);
             _ = try self.output.flush();
         }
