@@ -26,6 +26,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         allocator: std.mem.Allocator,
         settings: Settings,
         tty: File,
+        isEndOfUserInput: *const fn(keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = comptime_settings.isEndOfUserInput,
 
         // variables that are changed as the program runs
         input: RingBufferedReader,
@@ -35,6 +36,18 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         input_buffer: array_list.Array(u8),
         backup_buffer: array_list.Array(u8),
 
+        /// variables handles user input buffer after cursor (when user change
+        /// cursor position by arrow keys)
+        /// initial_cursor_position: initial buffer length
+        ///
+        /// eg. [_, _, _, y, z]
+        ///
+        /// valid: "yz"
+        /// post_cursor_position: 3
+        ///
+        /// after user press right arrow key...
+        /// valid: "z"
+        /// post_cursor_position: 4
         post_cursor_buffer: []u8,
         post_cursor_position: usize,
 
@@ -62,7 +75,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 break :blk log_file;
             };
 
-            return Self {
+            return Self{
                 .tty = tty,
                 .input = input,
                 .output = output,
@@ -98,8 +111,6 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 try self.printPrompt();
 
                 try self.readUserInput();
-                const post_cursor_input = self.post_cursor_buffer[self.post_cursor_position..];
-                try self.input_buffer.appendSlice(post_cursor_input);
                 if (self.settings.execute(self.input_buffer.getAll())) {
                     return;
                 }
@@ -149,8 +160,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         fn readUserInput(self: *Self) !void {
             try self.setRawInputMode();
             defer self.setOriginalInputMode() catch |err| {
-                self.printf("Failed to set original input mode: {any}", .{err})
-                    catch unreachable;
+                self.printf("Failed to set original input mode: {any}", .{err}) catch unreachable;
             };
 
             self.input_buffer.truncate(0);
@@ -158,25 +168,19 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             self.history_selected = null;
 
             while (true) {
-                defer {
-                    self.log_to_file("input_buffer: {s}\n", .{self.input_buffer.getAll()}) catch unreachable;
-                    self.log_to_file("post_cursor_buffer: {s}\n", .{self.post_cursor_buffer[self.post_cursor_position..]}) catch unreachable;
-                }
-
                 const input = try self.input.readConst();
-                self.log_to_file("read: {s}, bytes: {d}\n", .{input, input}) catch unreachable;
+                try self.log_to_file("read: {s}, bytes: {d}\n", .{ input, input });
                 const handled = try self.handleKeyBind(input);
                 if (handled) {
+                    try self.log_to_file("handled keybind: {s}\n", .{input});
                     continue;
                 }
 
-                // TODO: better way to check end
-                for (input) |byte| {
-                    if (isEnd(byte)) {
-                        _ = try self.output.write("\r\n");
-                        _ = try self.output.flush();
-                        return;
-                    }
+                if (self.isEndOfUserInput(input, self.input_buffer.getAll(), self.validPostCursorBuffer())) {
+                    try self.input_buffer.appendSlice(self.validPostCursorBuffer());
+                    _ = try self.output.write("\r\n");
+                    _ = try self.output.flush();
+                    return;
                 }
 
                 try self.input_buffer.appendSlice(input);
@@ -211,6 +215,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 self.post_cursor_buffer = new_post_cursor_buffer;
                 break :blk post_buffer_position - bytes.len;
             };
+
             std.mem.copy(u8, self.post_cursor_buffer[final_post_buffer_cursor..], bytes);
             self.post_cursor_position = final_post_buffer_cursor;
         }
@@ -335,6 +340,10 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             _ = try self.output.flush();
         }
 
+        inline fn validPostCursorBuffer(self: *Self) []const u8 {
+            return self.post_cursor_buffer[self.post_cursor_position..];
+        }
+
         // TODO: eval function at comptime
         inline fn log_to_file(self: *Self, comptime fmt: []const u8, args: anytype) !void {
             if (self.log_file) |f| {
@@ -348,6 +357,7 @@ pub const ComptimeSettings = struct {
     input_buffer_size: usize = 4096,
     history_size: usize = 100,
     log_file_path: ?[]const u8 = null,
+    isEndOfUserInput: fn(keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = defaults.isEndOfUserInput,
 };
 
 pub const Settings = struct {
