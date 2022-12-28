@@ -58,10 +58,12 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
         .Pointer => |p| {
             switch (p.size) {
                 .One => {
-                    try writer.print("{s} {s} \n{s}└─", .{ id_colored, type_name, prefix.items });
+                    try writer.print("{s} {s} {s} {any}\n{s}└─", .{ id_colored, type_name, arrow, arg, prefix.items});
                     try treePrintPrefix(prefix, writer, arg.*, ".*");
                 },
-
+                .Slice => {
+                    const child_type = p.child;
+                },
                 else => {
                     try writer.print("{s} {s} {s} unhandled", .{ id_colored, type_name, arrow });
                 },
