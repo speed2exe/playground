@@ -170,6 +170,13 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             self.history_selected = null;
 
             while (true) {
+
+            defer {
+                self.log_var_to_file(self.input_buffer, "input_buffer") catch unreachable;
+                self.log_var_to_file(self.post_cursor_buffer, "post_cursor_buffer") catch unreachable;
+                self.log_var_to_file(self.post_cursor_position, "post_cursor_position") catch unreachable;
+            }
+
                 const input = try self.input.readConst();
                 try self.log_to_file("read: {s}, bytes: {d}\n", .{ input, input });
                 const handled = try self.handleKeyBind(input);
@@ -263,9 +270,6 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const byte = self.input_buffer.pop() orelse return;
             try self.prependPostCursorBuffer(&[_]u8{byte});
             try self.printf("\x1b[D", .{});
-            try self.log_var_to_file(self.input_buffer, "input_buffer");
-            // self.log_var_to_file(self.post_cursor_buffer, "post_cursor_buffer");
-            // self.log_var_to_file(self.post_cursor_position, "post_cursor_position");
         }
 
         fn moveCursorRight(self: *Self) !void {
@@ -316,7 +320,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         fn setInputBufferContent(self: *Self, content: []const u8) !void {
-            self.post_cursor_position = self.post_cursor_buffer.len;
+            self.post_cursor_position = self.post_cursor_buffer.len; //todos something wrong
             self.input_buffer.truncate(0);
             try self.input_buffer.appendSlice(content);
         }
@@ -326,6 +330,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             try self.printf("\r\x1b[K", .{});
             try self.printPrompt();
             try self.printInputBuffer();
+            self.post_cursor_position = self.post_cursor_buffer.len;
         }
 
         inline fn printInputBuffer(self: *Self) !void {

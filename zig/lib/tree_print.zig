@@ -47,10 +47,8 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
             if (arg.len == 0) {
                 return;
             }
-            {
-                if (a.child == u8) {
-                    try writer.print(" {s} \"{s}\"", .{ arrow, arg });
-                }
+            if (a.child == u8) {
+                try writer.print(" {s} \"{s}\"", .{ arrow, arg });
             }
             {
                 const backup_len = prefix.items.len;
@@ -70,7 +68,7 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
         .Pointer => |p| {
             switch (p.size) {
                 .One => {
-                    try writer.print("{s} {s} {s} @{x}", .{ id_colored, type_name_colored, arrow, @ptrToInt(arg) });
+                    try writer.print("{s} {s} \x1b[34m@{x}\x1b[m", .{ id_colored, type_name_colored, @ptrToInt(arg) });
                     if (p.child == anyopaque) {
                         return;
                     }
@@ -99,9 +97,13 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
                 },
                 .Slice => {
                     try writer.print("{s} {s}", .{ id_colored, type_name_colored });
-                    if (p.child == u8) {
-                        try writer.print(" {s} \"{s}\"", .{ arrow, arg });
+                    if (arg.len == 0) {
+                        return;
                     }
+                    if (p.child == u8) {
+                        try writer.print(" \"{s}\"", .{arg});
+                    }
+                    try writer.print(" \x1b[34m@{x}\x1b[m", .{ @ptrToInt(arg.ptr) });
                     {
                         const backup_len = prefix.items.len;
                         for (arg[0 .. arg.len - 1]) |item, i| {
@@ -176,7 +178,7 @@ pub fn main() !void {
         .int_ptr = &int,
     };
 
-    var cc = CreditCard {
+    var cc = CreditCard{
         .name = "john",
         .number = 999,
         .number2 = 999,
