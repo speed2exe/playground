@@ -8,17 +8,19 @@ pub fn treePrint(allocator: std.mem.Allocator, writer: anytype, arg: anytype, co
     var prefix = std.ArrayList(u8).init(allocator);
     defer prefix.deinit();
     try treePrintPrefix(&prefix, writer, arg, id);
+    try writer.print("\n", .{});
 }
 
 fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime id: []const u8) !void {
     const arg_type = @TypeOf(arg);
     const type_info = @typeInfo(arg_type);
-    const type_name = "\x1b[36m" ++ @typeName(arg_type) ++ "\x1b[m"; // cyan colored
+    const type_name = @typeName(arg_type);
+    const type_name_colored = "\x1b[36m" ++ type_name ++ "\x1b[m"; // cyan colored
     const id_colored = "\x1b[33m" ++ id ++ "\x1b[m"; // yellow colored
 
     switch (type_info) {
         .Struct => |s| {
-            try writer.print("{s} {s}", .{ id_colored, type_name });
+            try writer.print("{s} {s}", .{ id_colored, type_name_colored });
             const last_field_idx = type_info.Struct.fields.len - 1;
             if (last_field_idx == -1) {
                 return;
@@ -41,7 +43,7 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
             }
         },
         .Array => |a| {
-            try writer.print("{s} {s}", .{ id_colored, type_name });
+            try writer.print("{s} {s}", .{ id_colored, type_name_colored });
             if (arg.len == 0) {
                 return;
             }
@@ -68,13 +70,35 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
         .Pointer => |p| {
             switch (p.size) {
                 .One => {
-                    try writer.print("{s} {s} {s} {any}\n{s}└─", .{ id_colored, type_name, arrow, arg, prefix.items });
-                    if (isComptime(arg)) {
+                    try writer.print("{s} {s} {s} @{x}", .{ id_colored, type_name_colored, arrow, @ptrToInt(arg) });
+                    if (p.child == anyopaque) {
+                        return;
+                    }
+                    const child_type_info = @typeInfo(p.child);
+                    switch (child_type_info) {
+                        .Fn => {
+                            return;
+                        },
+                        else => {},
+                    }
+                    if (!isComptime(arg)) {
+                        switch (child_type_info) {
+                            .Opaque => {
+                                return;
+                            },
+                            else => {},
+                        }
+                    }
+                    {
+                        try writer.print("\n{s}└─", .{ prefix.items });
+                        const backup_len = prefix.items.len;
+                        try prefix.appendSlice("  ");
                         try treePrintPrefix(prefix, writer, arg.*, ".*");
+                        prefix.shrinkRetainingCapacity(backup_len);
                     }
                 },
                 .Slice => {
-                    try writer.print("{s} {s}", .{ id_colored, type_name });
+                    try writer.print("{s} {s}", .{ id_colored, type_name_colored });
                     if (p.child == u8) {
                         try writer.print(" {s} \"{s}\"", .{ arrow, arg });
                     }
@@ -94,36 +118,37 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
                     }
                 },
                 else => {
-                    try writer.print("{s} {s} {s} {any}", .{ id_colored, type_name, arrow, arg });
+                    try writer.print("{s} {s} {s} {any}", .{ id_colored, type_name_colored, arrow, arg });
                 },
             }
         },
         .Optional => {
             const value = arg orelse {
-                try writer.print("{s} {s} {s} null", .{ id_colored, type_name, arrow });
+                try writer.print("{s} {s} {s} null", .{ id_colored, type_name_colored, arrow });
                 return;
             };
-            try writer.print("{s} {s} \n{s}└─", .{ id_colored, type_name, prefix.items });
+            try writer.print("{s} {s} \n{s}└─", .{ id_colored, type_name_colored, prefix.items });
             try treePrintPrefix(prefix, writer, value, ".?");
         },
         else => {
-            try writer.print("{s} {s} {s} {any}", .{ id_colored, type_name, arrow, arg });
+            try writer.print("{s} {s} {s} {any}", .{ id_colored, type_name_colored, arrow, arg });
         },
     }
 }
 
 const Person = struct {
     o_i: ?i32 = 9,
-    o_j: ?i32 = null,
-    v: void = undefined,
-    b: bool = true,
-    f: f32 = 3.14,
-    age: u8,
-    name: []const u8,
-    cc: CreditCard = .{},
-    code: [3]u8 = [_]u8{ 1, 2, 3 },
-    k: type = u16,
+    // o_j: ?i32 = null,
+    // v: void = undefined,
+    // b: bool = true,
+    // f: f32 = 3.14,
+    // age: u8 = 34,
+    // name: []const u8 = "jon",
+    // cc: CreditCard = .{},
+    // code: [3]u8 = [_]u8{ 1, 2, 3 },
+    // k: type = u16,
     int_ptr: *const u8,
+    f: *const fn () void = myFunc,
 };
 
 const CreditCard = struct {
@@ -138,22 +163,46 @@ const Debt = struct {
     amount: u64 = 888,
 };
 
+const Debt2 = struct {
+    id: *u32,
+};
+
 pub fn main() !void {
-    const int: u8 = 7;
+    var w = std.io.getStdOut().writer();
+    var int: u8 = 7;
 
     // std.fmt.format
     const person = Person{
-        .age = 20,
-        .name = "John",
         .int_ptr = &int,
     };
 
-    var w = std.io.getStdOut().writer();
+    var cc = CreditCard {
+        .name = "john",
+        .number = 999,
+        .number2 = 999,
+        .debt = Debt{
+            .id = 0,
+            .amount = 888,
+        },
+    };
+    // const person1 = Person{
+    //     .age = 20,
+    //     .name = "John",
+    //     .int_ptr = &int,
+    // };
 
-    // treePrint(std.io.getStdOut(), person);
-    try treePrint(std.heap.page_allocator, w, person, "person");
+    var i: u32 = 0;
+    var d2 = Debt2{
+        .id = &i,
+    };
+
+    try treePrint(std.heap.page_allocator, w, d2, "d23333");
+    try treePrint(std.heap.page_allocator, w, person, "\nperson");
+    try treePrint(std.heap.page_allocator, w, cc, "\ncc");
 }
 
 inline fn isComptime(val: anytype) bool {
-    return @typeInfo(@TypeOf(.{ val })).Struct.fields[0].is_comptime;
+    return @typeInfo(@TypeOf(.{val})).Struct.fields[0].is_comptime;
 }
+
+fn myFunc() void {}

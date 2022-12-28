@@ -8,6 +8,7 @@ pub fn treePrint(allocator: std.mem.Allocator, writer: anytype, arg: anytype, co
     var prefix = std.ArrayList(u8).init(allocator);
     defer prefix.deinit();
     try treePrintPrefix(&prefix, writer, arg, id);
+    try writer.print("\n", .{});
 }
 
 fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime id: []const u8) !void {
@@ -69,7 +70,7 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
         .Pointer => |p| {
             switch (p.size) {
                 .One => {
-                    try writer.print("{s} {s} {s} {any}\n{s}└─", .{ id_colored, type_name_colored, arrow, arg, prefix.items });
+                    try writer.print("{s} {s} {s} @{x}", .{ id_colored, type_name_colored, arrow, @ptrToInt(arg) });
                     if (p.child == anyopaque) {
                         return;
                     }
@@ -88,7 +89,13 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
                             else => {},
                         }
                     }
-                    try treePrintPrefix(prefix, writer, arg.*, ".*");
+                    {
+                        try writer.print("\n{s}└─", .{ prefix.items });
+                        const backup_len = prefix.items.len;
+                        try prefix.appendSlice("  ");
+                        try treePrintPrefix(prefix, writer, arg.*, ".*");
+                        prefix.shrinkRetainingCapacity(backup_len);
+                    }
                 },
                 .Slice => {
                     try writer.print("{s} {s}", .{ id_colored, type_name_colored });
@@ -169,15 +176,15 @@ pub fn main() !void {
         .int_ptr = &int,
     };
 
-    // var cc = CreditCard {
-    //     .name = "john",
-    //     .number = 999,
-    //     .number2 = 999,
-    //     .debt = Debt{
-    //         .id = 0,
-    //         .amount = 888,
-    //     },
-    // };
+    var cc = CreditCard {
+        .name = "john",
+        .number = 999,
+        .number2 = 999,
+        .debt = Debt{
+            .id = 0,
+            .amount = 888,
+        },
+    };
     // const person1 = Person{
     //     .age = 20,
     //     .name = "John",
@@ -189,8 +196,9 @@ pub fn main() !void {
         .id = &i,
     };
 
-    try treePrint(std.heap.page_allocator, w, d2, "d2");
+    try treePrint(std.heap.page_allocator, w, d2, "d23333");
     try treePrint(std.heap.page_allocator, w, person, "\nperson");
+    try treePrint(std.heap.page_allocator, w, cc, "\ncc");
 }
 
 inline fn isComptime(val: anytype) bool {
