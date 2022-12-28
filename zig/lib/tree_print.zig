@@ -19,53 +19,80 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
     switch (type_info) {
         .Struct => |s| {
             try writer.print("{s} {s}", .{ id_colored, type_name });
-            const backup_len = prefix.items.len;
             const last_field_idx = type_info.Struct.fields.len - 1;
             if (last_field_idx == -1) {
                 return;
             }
-
-            inline for (s.fields[0..last_field_idx]) |field| {
-                try writer.print("\n{s}├─", .{ prefix.items });
-                try prefix.appendSlice("│ ");
-                try treePrintPrefix(prefix, writer, @field(arg, field.name), "."++field.name);
+            const backup_len = prefix.items.len;
+            {
+                inline for (s.fields[0..last_field_idx]) |field| {
+                    try writer.print("\n{s}├─", .{ prefix.items });
+                    try prefix.appendSlice("│ ");
+                    try treePrintPrefix(prefix, writer, @field(arg, field.name), "."++field.name);
+                    prefix.shrinkRetainingCapacity(backup_len);
+                }
+            }
+            {
+                try writer.print("\n{s}└─", .{ prefix.items });
+                const last_field_name = s.fields[last_field_idx].name;
+                try prefix.appendSlice("  ");
+                try treePrintPrefix(prefix, writer, @field(arg, last_field_name), "." ++ last_field_name);
                 prefix.shrinkRetainingCapacity(backup_len);
             }
-
-            try writer.print("\n{s}└─", .{ prefix.items });
-            const last_field_name = s.fields[last_field_idx].name;
-            try prefix.appendSlice("  ");
-            try treePrintPrefix(prefix, writer, @field(arg, last_field_name), "." ++ last_field_name);
-            prefix.shrinkRetainingCapacity(backup_len);
         },
         .Array => |a| {
             try writer.print("{s} {s}", .{ id_colored, type_name });
-            const backup_len = prefix.items.len;
-            const array_len = a.len;
-            if (array_len == 0) {
+            if (arg.len == 0) {
                 return;
             }
-            inline for (arg[0 .. array_len - 1]) |item, i| {
-                try writer.print("\n{s}├─\x1b[33m[{d}]\x1b[m", .{ prefix.items, i });
-                try prefix.appendSlice("│ ");
-                try treePrintPrefix(prefix, writer, item, "");
-                prefix.shrinkRetainingCapacity(backup_len);
+            {
+                if (a.child == u8) {
+                    try writer.print(" {s} \"{s}\"", .{ arrow, arg });
+                }
             }
-            try writer.print("\n{s}└─\x1b[33m[{d}]\x1b[m", .{ prefix.items, array_len - 1 });
-            try prefix.appendSlice("  ");
-            try treePrintPrefix(prefix, writer, arg[array_len - 1], "");
+            {
+                const backup_len = prefix.items.len;
+                inline for (arg[0 .. arg.len - 1]) |item, i| {
+                    try writer.print("\n{s}├─\x1b[33m[{d}]\x1b[m", .{ prefix.items, i });
+                    try prefix.appendSlice("│ ");
+                    try treePrintPrefix(prefix, writer, item, "");
+                    prefix.shrinkRetainingCapacity(backup_len);
+                }
+            }
+            {
+                try writer.print("\n{s}└─\x1b[33m[{d}]\x1b[m", .{ prefix.items, arg.len - 1 });
+                try prefix.appendSlice("  ");
+                try treePrintPrefix(prefix, writer, arg[arg.len - 1], "");
+            }
         },
         .Pointer => |p| {
             switch (p.size) {
                 .One => {
-                    try writer.print("{s} {s} {s} {any}\n{s}└─", .{ id_colored, type_name, arrow, arg, prefix.items});
+                    try writer.print("{s} {s} {s} {any}\n{s}└─", .{ id_colored, type_name, arrow, arg, prefix.items });
                     try treePrintPrefix(prefix, writer, arg.*, ".*");
                 },
                 .Slice => {
-                    const child_type = p.child;
+                    try writer.print("{s} {s}", .{ id_colored, type_name });
+                    if (p.child == u8) {
+                        try writer.print(" {s} \"{s}\"", .{ arrow, arg });
+                    }
+                    {
+                        const backup_len = prefix.items.len;
+                        for (arg[0 .. arg.len - 1]) |item, i| {
+                            try writer.print("\n{s}├─\x1b[33m[{d}]\x1b[m", .{ prefix.items, i });
+                            try prefix.appendSlice("│ ");
+                            try treePrintPrefix(prefix, writer, item, "");
+                            prefix.shrinkRetainingCapacity(backup_len);
+                        }
+                    }
+                    {
+                        try writer.print("\n{s}└─\x1b[33m[{d}]\x1b[m", .{ prefix.items, arg.len - 1 });
+                        try prefix.appendSlice("  ");
+                        try treePrintPrefix(prefix, writer, arg[arg.len - 1], "");
+                    }
                 },
                 else => {
-                    try writer.print("{s} {s} {s} unhandled", .{ id_colored, type_name, arrow });
+                    try writer.print("{s} {s} {s} {any}", .{ id_colored, type_name, arrow, arg });
                 },
             }
         },
@@ -124,5 +151,3 @@ pub fn main() !void {
     // treePrint(std.io.getStdOut(), person);
     try treePrint(std.heap.page_allocator, w, person);
 }
-
-// TODO: Array
