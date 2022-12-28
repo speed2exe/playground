@@ -151,7 +151,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             self.input_buffer = node_buffer;
         }
 
-        fn printPrompt(self: *Self) !void {
+        inline fn printPrompt(self: *Self) !void {
             // TODO: might add dynamic prompt later
             try self.printf("{s}", .{self.settings.prompt});
         }
