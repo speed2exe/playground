@@ -7,7 +7,7 @@ const arrow = "\x1b[90m" ++ "=>" ++ "\x1b[m";
 pub fn treePrint(allocator: std.mem.Allocator, writer: anytype, arg: anytype) !void {
     var prefix = std.ArrayList(u8).init(allocator);
     defer prefix.deinit();
-    try treePrintPrefix(&prefix, writer, arg, "(arg)");
+    try treePrintPrefix(&prefix, writer, arg, ".");
 }
 
 pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime id: []const u8) !void {
@@ -21,31 +21,34 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
 
     switch (type_info) {
         .Type => {
-            try writer.print("{s}{s} {s} {s} {s}\n", .{ prefix.items, id_colored, type_name, arrow, @typeName(arg) });
+            try writer.print("{s} {s} {s} {s}", .{ id_colored, type_name, arrow, @typeName(arg) });
         },
         .Struct => |s| {
-            try writer.print("{s}{s} {s}\n", .{ prefix.items, id_colored, type_name });
+            try writer.print("{s} {s}", .{ id_colored, type_name });
             const backup = prefix.items.len;
             const last_field_idx = type_info.Struct.fields.len - 1;
             if (last_field_idx == -1) {
                 return;
             }
 
-            try prefix.appendSlice(" ├─ ");
             inline for (s.fields[0..last_field_idx]) |field| {
+                try writer.print("\n{s}├─ ", .{ prefix.items });
+                try prefix.appendSlice("│  ");
                 try treePrintPrefix(prefix, writer, @field(arg, field.name), field.name);
+                prefix.shrinkRetainingCapacity(backup);
             }
 
-            prefix.shrinkRetainingCapacity(backup);
-            try prefix.appendSlice(" └─ ");
+            try writer.print("\n{s}└─ ", .{ prefix.items });
             const last_field_name = s.fields[last_field_idx].name;
+            try prefix.appendSlice("   ");
             try treePrintPrefix(prefix, writer, @field(arg, last_field_name), last_field_name);
+            prefix.shrinkRetainingCapacity(backup);
         },
         .Int => {
-            try writer.print("{s}{s} {s} {s} {d}\n", .{ prefix.items, id_colored, type_name, arrow, arg });
+            try writer.print("{s} {s} {s} {d}", .{ id_colored, type_name, arrow, arg });
         },
         else => {
-            try writer.print("{s}{s} {s} {s} (not handled)\n", .{ prefix.items, id_colored, type_name, arrow });
+            try writer.print("{s} {s} {s} (not handled)", .{ id_colored, type_name, arrow });
         },
     }
 }
@@ -53,7 +56,20 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
 const Person = struct {
     age: u8,
     name: []const u8,
+    cc: CreditCard = .{},
     k: type = u16,
+};
+
+const CreditCard = struct {
+    name: []const u8 = "john",
+    number: u64 = 999,
+    number2: u64 = 999,
+    debt: Debt = .{},
+};
+
+const Debt = struct {
+    id: u32 = 0,
+    amount: u64 = 888,
 };
 
 pub fn main() !void {
