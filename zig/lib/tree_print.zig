@@ -61,8 +61,9 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
                     try writer.print("{s} {s} \n{s}└─", .{ id_colored, type_name, prefix.items });
                     try treePrintPrefix(prefix, writer, arg.*, ".*");
                 },
+
                 else => {
-                    try writer.print("{s} {s}", .{ id_colored, type_name });
+                    try writer.print("{s} {s} {s} unhandled", .{ id_colored, type_name, arrow });
                 },
             }
         },
