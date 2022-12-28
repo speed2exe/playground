@@ -7,7 +7,7 @@ const arrow = "\x1b[90m" ++ "=>" ++ "\x1b[m";
 pub fn treePrint(allocator: std.mem.Allocator, writer: anytype, arg: anytype) !void {
     var prefix = std.ArrayList(u8).init(allocator);
     defer prefix.deinit();
-    try treePrintPrefix(&prefix, writer, arg, ".");
+    try treePrintPrefix(&prefix, writer, arg, "(arg)");
 }
 
 pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime id: []const u8) !void {
@@ -34,14 +34,14 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
             inline for (s.fields[0..last_field_idx]) |field| {
                 try writer.print("\n{s}├─ ", .{ prefix.items });
                 try prefix.appendSlice("│  ");
-                try treePrintPrefix(prefix, writer, @field(arg, field.name), field.name);
+                try treePrintPrefix(prefix, writer, @field(arg, field.name), "."++field.name);
                 prefix.shrinkRetainingCapacity(backup_len);
             }
 
             try writer.print("\n{s}└─ ", .{ prefix.items });
             const last_field_name = s.fields[last_field_idx].name;
             try prefix.appendSlice("   ");
-            try treePrintPrefix(prefix, writer, @field(arg, last_field_name), last_field_name);
+            try treePrintPrefix(prefix, writer, @field(arg, last_field_name), "." ++ last_field_name);
             prefix.shrinkRetainingCapacity(backup_len);
         },
         .Int => {
@@ -67,7 +67,7 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
         .Pointer => |p| {
             switch (p.size) {
                 .One => {
-                    try writer.print("{s} * {s} ", .{ id_colored, arrow});
+                    try writer.print("{s} {s} \n{s}└─ ", .{ id_colored, type_name, prefix.items });
                     try treePrintPrefix(prefix, writer, arg.*, ".*");
                 },
                 else => {
