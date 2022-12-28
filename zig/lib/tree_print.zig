@@ -25,7 +25,7 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
         },
         .Struct => |s| {
             try writer.print("{s} {s}", .{ id_colored, type_name });
-            const backup = prefix.items.len;
+            const backup_len = prefix.items.len;
             const last_field_idx = type_info.Struct.fields.len - 1;
             if (last_field_idx == -1) {
                 return;
@@ -35,17 +35,34 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
                 try writer.print("\n{s}├─ ", .{ prefix.items });
                 try prefix.appendSlice("│  ");
                 try treePrintPrefix(prefix, writer, @field(arg, field.name), field.name);
-                prefix.shrinkRetainingCapacity(backup);
+                prefix.shrinkRetainingCapacity(backup_len);
             }
 
             try writer.print("\n{s}└─ ", .{ prefix.items });
             const last_field_name = s.fields[last_field_idx].name;
             try prefix.appendSlice("   ");
             try treePrintPrefix(prefix, writer, @field(arg, last_field_name), last_field_name);
-            prefix.shrinkRetainingCapacity(backup);
+            prefix.shrinkRetainingCapacity(backup_len);
         },
         .Int => {
             try writer.print("{s} {s} {s} {d}", .{ id_colored, type_name, arrow, arg });
+        },
+        .Array => |a| {
+            try writer.print("{s} {s}", .{ id_colored, type_name });
+            const backup_len = prefix.items.len;
+            const array_len = a.len;
+            if (array_len == 0) {
+                return;
+            }
+            inline for (arg[0..array_len - 1]) |item, i| {
+                try writer.print("\n{s}├─ \x1b[33m{d}\x1b[m", .{ prefix.items, i });
+                try prefix.appendSlice("│  ");
+                try treePrintPrefix(prefix, writer, item, "");
+                prefix.shrinkRetainingCapacity(backup_len);
+            }
+            try writer.print("\n{s}└─ \x1b[33m{d}\x1b[m", .{ prefix.items, array_len - 1});
+            try prefix.appendSlice("   ");
+            try treePrintPrefix(prefix, writer, arg[array_len - 1], "");
         },
         else => {
             try writer.print("{s} {s} {s} (not handled)", .{ id_colored, type_name, arrow });
@@ -57,6 +74,7 @@ const Person = struct {
     age: u8,
     name: []const u8,
     cc: CreditCard = .{},
+    code: [3]u8 = [_]u8{ 1, 2, 3 },
     k: type = u16,
 };
 
@@ -85,4 +103,4 @@ pub fn main() !void {
     try treePrint(std.heap.page_allocator, w, person);
 }
 
-// TODO: check for leak
+// TODO: Array
