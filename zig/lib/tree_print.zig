@@ -4,13 +4,13 @@ const log = std.log;
 
 const arrow = "\x1b[90m" ++ "=>" ++ "\x1b[m";
 
-pub fn treePrint(allocator: std.mem.Allocator, writer: anytype, arg: anytype) !void {
+pub fn treePrint(allocator: std.mem.Allocator, writer: anytype, arg: anytype, comptime id: []const u8) !void {
     var prefix = std.ArrayList(u8).init(allocator);
     defer prefix.deinit();
-    try treePrintPrefix(&prefix, writer, arg, "(arg)");
+    try treePrintPrefix(&prefix, writer, arg, id);
 }
 
-pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime id: []const u8) !void {
+fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime id: []const u8) !void {
     const arg_type = @TypeOf(arg);
     const type_info = @typeInfo(arg_type);
     const type_name = "\x1b[36m" ++ @typeName(arg_type) ++ "\x1b[m"; // cyan colored
@@ -149,5 +149,5 @@ pub fn main() !void {
     var w = std.io.getStdOut().writer();
 
     // treePrint(std.io.getStdOut(), person);
-    try treePrint(std.heap.page_allocator, w, person);
+    try treePrint(std.heap.page_allocator, w, person, "person");
 }
