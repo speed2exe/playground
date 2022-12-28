@@ -28,6 +28,9 @@ pub fn main () !void {
     // std.io.getStdIn().read
 
 
+    std.log.info("{any}",.{@typeInfo(anyopaque)});
+
+
 }
 
 

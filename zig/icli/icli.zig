@@ -5,6 +5,7 @@ const fdll = @import("./fixed_doubly_linked_list.zig");
 const ring_buffered_reader = @import("./ring_buffered_reader.zig");
 const ring_buffered_writer = @import("./ring_buffered_writer.zig");
 const defaults = @import("./defaults.zig");
+const tree_print = @import("./tree_print.zig");
 const File = std.fs.File;
 const OpenMode = std.fs.File.OpenMode;
 const termios = switch (builtin.os.tag) {
@@ -158,6 +159,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         /// Read user input and store it in self.input_buffer
         fn readUserInput(self: *Self) !void {
+            try self.log_to_file("readUserInput: waiting...\n",.{});
             try self.setRawInputMode();
             defer self.setOriginalInputMode() catch |err| {
                 self.printf("Failed to set original input mode: {any}", .{err}) catch unreachable;
@@ -261,6 +263,9 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const byte = self.input_buffer.pop() orelse return;
             try self.prependPostCursorBuffer(&[_]u8{byte});
             try self.printf("\x1b[D", .{});
+            try self.log_var_to_file(self.input_buffer, "input_buffer");
+            // self.log_var_to_file(self.post_cursor_buffer, "post_cursor_buffer");
+            // self.log_var_to_file(self.post_cursor_position, "post_cursor_position");
         }
 
         fn moveCursorRight(self: *Self) !void {
@@ -348,6 +353,12 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         inline fn log_to_file(self: *Self, comptime fmt: []const u8, args: anytype) !void {
             if (self.log_file) |f| {
                 try std.fmt.format(f.writer(), fmt, args);
+            }
+        }
+
+        inline fn log_var_to_file(self: *Self, v: anytype, comptime name: []const u8) !void {
+            if (self.log_file) |f| {
+                try tree_print.treePrint(self.allocator, f.writer(), v, name);
             }
         }
     };
