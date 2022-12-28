@@ -54,15 +54,26 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
             if (array_len == 0) {
                 return;
             }
-            inline for (arg[0..array_len - 1]) |item, i| {
-                try writer.print("\n{s}├─ \x1b[33m{d}\x1b[m", .{ prefix.items, i });
+            inline for (arg[0 .. array_len - 1]) |item, i| {
+                try writer.print("\n{s}├─ \x1b[33m[{d}]\x1b[m", .{ prefix.items, i });
                 try prefix.appendSlice("│  ");
                 try treePrintPrefix(prefix, writer, item, "");
                 prefix.shrinkRetainingCapacity(backup_len);
             }
-            try writer.print("\n{s}└─ \x1b[33m{d}\x1b[m", .{ prefix.items, array_len - 1});
+            try writer.print("\n{s}└─ \x1b[33m[{d}]\x1b[m", .{ prefix.items, array_len - 1 });
             try prefix.appendSlice("   ");
             try treePrintPrefix(prefix, writer, arg[array_len - 1], "");
+        },
+        .Pointer => |p| {
+            switch (p.size) {
+                .One => {
+                    try writer.print("{s} * {s} ", .{ id_colored, arrow});
+                    try treePrintPrefix(prefix, writer, arg.*, ".*");
+                },
+                else => {
+                    try writer.print("{s} {s}", .{ id_colored, type_name });
+                },
+            }
         },
         else => {
             try writer.print("{s} {s} {s} (not handled)", .{ id_colored, type_name, arrow });
@@ -76,6 +87,7 @@ const Person = struct {
     cc: CreditCard = .{},
     code: [3]u8 = [_]u8{ 1, 2, 3 },
     k: type = u16,
+    int_ptr: *const u8,
 };
 
 const CreditCard = struct {
@@ -91,10 +103,13 @@ const Debt = struct {
 };
 
 pub fn main() !void {
+    const int: u8 = 7;
+
     // std.fmt.format
     const person = Person{
         .age = 20,
         .name = "John",
+        .int_ptr = &int,
     };
 
     var w = std.io.getStdOut().writer();
