@@ -16,9 +16,6 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
     const type_name = "\x1b[36m" ++ @typeName(arg_type) ++ "\x1b[m"; // cyan colored
     const id_colored = "\x1b[33m" ++ id ++ "\x1b[m"; // yellow colored
 
-    // TODO: for reference purposes
-    // std.fmt.format
-
     switch (type_info) {
         .Struct => |s| {
             try writer.print("{s} {s}", .{ id_colored, type_name });
@@ -69,6 +66,14 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
                 },
             }
         },
+        .Optional => {
+            const value = arg orelse {
+                try writer.print("{s} {s} {s} null", .{ id_colored, type_name, arrow });
+                return;
+            };
+            try writer.print("{s} {s} \n{s}└─", .{ id_colored, type_name, prefix.items });
+            try treePrintPrefix(prefix, writer, value, ".?");
+        },
         else => {
             try writer.print("{s} {s} {s} {any}", .{ id_colored, type_name, arrow, arg });
         },
@@ -76,6 +81,8 @@ pub fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype
 }
 
 const Person = struct {
+    o_i: ?i32 = 9,
+    o_j: ?i32 = null,
     v: void = undefined,
     b: bool = true,
     f: f32 = 3.14,
