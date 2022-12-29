@@ -21,7 +21,10 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
     switch (type_info) {
         .Struct => |s| {
             try writer.print("{s} {s}", .{ id_colored, type_name_colored });
-            const last_field_idx = type_info.Struct.fields.len - 1;
+            if (s.fields.len == 0) {
+                return;
+            }
+            const last_field_idx = s.fields.len - 1;
             if (last_field_idx == -1) {
                 return;
             }
@@ -103,7 +106,7 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
                     if (p.child == u8) {
                         try writer.print(" \"{s}\"", .{arg});
                     }
-                    try writer.print(" \x1b[34m@{x}\x1b[m", .{ @ptrToInt(arg.ptr) });
+                    try writer.print(" \x1b[34m@{x}\x1b[m", .{@ptrToInt(arg.ptr)});
                     {
                         const backup_len = prefix.items.len;
                         for (arg[0 .. arg.len - 1]) |item, i| {
@@ -120,7 +123,7 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
                     }
                 },
                 else => {
-                    try writer.print("{s} {s} {s} {any}", .{ id_colored, type_name_colored, arrow, arg });
+                    try writer.print("{s} {s} \x1b[34m@{x}\x1b[m", .{ id_colored, type_name_colored, @ptrToInt(arg) });
                 },
             }
         },

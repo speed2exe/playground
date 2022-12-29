@@ -8,3 +8,9 @@ pub fn isEndOfUserInput(keypress: []const u8, input_pre_cursor: []const u8, inpu
     // modify for other platforms
     return std.mem.eql(u8, keypress, "\r");
 }
+
+pub fn keymap() void {
+    std.AutoHashMap([]const u8, fn()void);
+}
+
+

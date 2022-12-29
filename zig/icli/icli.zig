@@ -170,11 +170,6 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             self.history_selected = null;
 
             while (true) {
-
-            defer {
-                self.log_pre_and_post_cursor_buffer() catch unreachable;
-            }
-
                 const input = try self.input.readConst();
                 try self.log_to_file("read: {s}, bytes: {d}\n", .{ input, input });
                 const handled = try self.handleKeyBind(input);
