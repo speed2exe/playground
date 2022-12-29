@@ -34,7 +34,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         output: RingBufferedWriter,
         history: History,
         history_selected: ?*History.Node, // current history node that user is using
-        input_buffer: array_list.Array(u8),
+        pre_cursor_buffer: array_list.Array(u8),
         backup_buffer: array_list.Array(u8),
 
         /// variables handles user input buffer after cursor (when user change
@@ -65,7 +65,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const original_termios = try std.os.tcgetattr(tty.handle);
             const raw_mode_termios = termios.getRawModeTermios(original_termios);
 
-            var input_buffer = array_list.Array(u8).init(settings.allocator);
+            var pre_cursor_buffer = array_list.Array(u8).init(settings.allocator);
             var backup_buffer = array_list.Array(u8).init(settings.allocator);
             var post_cursor_buffer = &[_]u8{};
 
@@ -86,7 +86,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 .allocator = settings.allocator,
                 .settings = settings,
                 .history_selected = null,
-                .input_buffer = input_buffer,
+                .pre_cursor_buffer = pre_cursor_buffer,
                 .backup_buffer = backup_buffer,
                 .post_cursor_buffer = post_cursor_buffer,
                 .post_cursor_position = 0,
@@ -95,7 +95,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         pub fn deinit(self: *Self) void {
-            self.input_buffer.deinit();
+            self.pre_cursor_buffer.deinit();
             self.backup_buffer.deinit();
 
             self.settings.allocator.free(self.post_cursor_buffer);
@@ -112,7 +112,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 try self.printPrompt();
 
                 try self.readUserInput();
-                if (self.settings.execute(self.input_buffer.getAll())) {
+                if (self.settings.execute(self.pre_cursor_buffer.getAll())) {
                     return;
                 }
                 self.postExecution();
@@ -126,7 +126,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             }
 
             if (self.history_selected) |h| {
-                if (std.mem.eql(u8, h.value.elems, self.input_buffer.elems)) {
+                if (std.mem.eql(u8, h.value.elems, self.pre_cursor_buffer.elems)) {
                     // h is invalidated after removal from self.history
                     // hence we need to get the buffer before removal
                     const history_buffer = h.value;
@@ -138,8 +138,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             }
 
             if (self.history.length < comptime_settings.history_size) {
-                _ = self.history.insertHead(self.input_buffer);
-                self.input_buffer = array_list.Array(u8).init(self.settings.allocator);
+                _ = self.history.insertHead(self.pre_cursor_buffer);
+                self.pre_cursor_buffer = array_list.Array(u8).init(self.settings.allocator);
                 return;
             }
 
@@ -148,8 +148,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const node = self.history.tail orelse unreachable;
             self.history.remove(node);
             const node_buffer = node.value;
-            _ = self.history.insertHead(self.input_buffer) orelse unreachable;
-            self.input_buffer = node_buffer;
+            _ = self.history.insertHead(self.pre_cursor_buffer) orelse unreachable;
+            self.pre_cursor_buffer = node_buffer;
         }
 
         inline fn printPrompt(self: *Self) !void {
@@ -165,16 +165,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 self.printf("Failed to set original input mode: {any}", .{err}) catch unreachable;
             };
 
-            self.input_buffer.truncate(0);
+            self.pre_cursor_buffer.truncate(0);
             self.post_cursor_position = self.post_cursor_buffer.len;
             self.history_selected = null;
 
             while (true) {
 
             defer {
-                self.log_var_to_file(self.input_buffer, "input_buffer") catch unreachable;
-                self.log_var_to_file(self.post_cursor_buffer, "post_cursor_buffer") catch unreachable;
-                self.log_var_to_file(self.post_cursor_position, "post_cursor_position") catch unreachable;
+                self.log_pre_and_post_cursor_buffer() catch unreachable;
             }
 
                 const input = try self.input.readConst();
@@ -185,14 +183,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                     continue;
                 }
 
-                if (self.isEndOfUserInput(input, self.input_buffer.getAll(), self.validPostCursorBuffer())) {
-                    try self.input_buffer.appendSlice(self.validPostCursorBuffer());
+                if (self.isEndOfUserInput(input, self.pre_cursor_buffer.getAll(), self.validPostCursorBuffer())) {
+                    try self.pre_cursor_buffer.appendSlice(self.validPostCursorBuffer());
                     _ = try self.output.write("\r\n");
                     _ = try self.output.flush();
                     return;
                 }
 
-                try self.input_buffer.appendSlice(input);
+                try self.pre_cursor_buffer.appendSlice(input);
                 _ = try self.output.write(input);
                 _ = try self.writePostCursorBuffer();
 
@@ -267,7 +265,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         fn moveCursorLeft(self: *Self) !void {
             // TODO: handle multi-byte characters
-            const byte = self.input_buffer.pop() orelse return;
+            const byte = self.pre_cursor_buffer.pop() orelse return;
             try self.prependPostCursorBuffer(&[_]u8{byte});
             try self.printf("\x1b[D", .{});
         }
@@ -279,14 +277,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
             // TODO: handle multi-byte characters
             const byte_after_cursor = self.post_cursor_buffer[self.post_cursor_position];
-            try self.input_buffer.append(byte_after_cursor);
+            try self.pre_cursor_buffer.append(byte_after_cursor);
             self.post_cursor_position += 1;
             try self.printf("\x1b[C", .{});
         }
 
         fn switchInputBuffer(self: *Self) void {
-            const tmp = self.input_buffer;
-            self.input_buffer = self.backup_buffer;
+            const tmp = self.pre_cursor_buffer;
+            self.pre_cursor_buffer = self.backup_buffer;
             self.backup_buffer = tmp;
         }
 
@@ -294,7 +292,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const history_selected = self.history_selected orelse {
                 self.history_selected = self.history.head orelse return;
                 self.switchInputBuffer();
-                try self.setInputBufferContent(self.history_selected.?.value.elems);
+                try self.setInputBufferContent(self.history_selected.?.value.getAll());
                 try self.reDraw();
                 return;
             };
@@ -320,21 +318,22 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         fn setInputBufferContent(self: *Self, content: []const u8) !void {
-            self.post_cursor_position = self.post_cursor_buffer.len; //todos something wrong
-            self.input_buffer.truncate(0);
-            try self.input_buffer.appendSlice(content);
+            self.invalidatePostCursorBuffer();
+            self.pre_cursor_buffer.truncate(0);
+            try self.pre_cursor_buffer.appendSlice(content);
         }
 
+        /// reDraws the prompt for user to see
+        /// TODO: redo for minor changes
         fn reDraw(self: *Self) !void {
             // move cursor to the beginning of the line & clear the line
             try self.printf("\r\x1b[K", .{});
             try self.printPrompt();
             try self.printInputBuffer();
-            self.post_cursor_position = self.post_cursor_buffer.len;
         }
 
         inline fn printInputBuffer(self: *Self) !void {
-            try self.printf("{s}", .{self.input_buffer.elems});
+            try self.printf("{s}", .{self.pre_cursor_buffer.elems});
         }
 
         inline fn setRawInputMode(self: *Self) !void {
@@ -350,11 +349,18 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             _ = try self.output.flush();
         }
 
+        inline fn validPreCursorBuffer(self: *Self) []const u8 {
+            return self.pre_cursor_buffer.getAll();
+        }
+
         inline fn validPostCursorBuffer(self: *Self) []const u8 {
             return self.post_cursor_buffer[self.post_cursor_position..];
         }
 
-        // TODO: eval function at comptime
+        inline fn invalidatePostCursorBuffer(self: *Self) void {
+            self.post_cursor_position = self.post_cursor_buffer.len;
+        }
+
         inline fn log_to_file(self: *Self, comptime fmt: []const u8, args: anytype) !void {
             if (self.log_file) |f| {
                 try std.fmt.format(f.writer(), fmt, args);
@@ -364,7 +370,13 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         inline fn log_var_to_file(self: *Self, v: anytype, comptime name: []const u8) !void {
             if (self.log_file) |f| {
                 try tree_print.treePrint(self.allocator, f.writer(), v, name);
+                try f.writer().print("\n",.{});
             }
+        }
+
+        inline fn log_pre_and_post_cursor_buffer(self: *Self) !void {
+            try self.log_var_to_file(self.validPreCursorBuffer(), "validPreCursorBuffer");
+            try self.log_var_to_file(self.validPostCursorBuffer(), "validPostCursorBuffer");
         }
     };
 }
