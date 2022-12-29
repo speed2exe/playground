@@ -21,6 +21,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, comptime_settings.input_buffer_size);
         const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), comptime_settings.history_size);
 
+        // Keybindings set up
+        // TODO: allow user to include
+        const Keybind = KeybindOf(Self);
+        const keybinds = []Keybind{
+            .{ .key = "h", .handler = Self.moveCursorLeft },
+        };
+        const keybind_by_key = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, keybinds);
+
         // variables that are pretty much unchanged once initialized
         original_termios: std.os.termios,
         raw_mode_termios: std.os.termios,
@@ -399,3 +407,10 @@ fn isEnd(byte: u8) bool {
 // TODO: support utf-8 input?
 // TODO: log to file
 // TODO: handle tab character
+
+fn KeybindOf(comptime T: type) type {
+    return struct {
+        key: []const u8,
+        handler: fn(*T) anyerror!void,
+    };
+}
