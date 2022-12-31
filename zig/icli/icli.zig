@@ -23,22 +23,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind
-        // const Keybind = KeybindOf(Self);
-        // const keybinds = [_]Keybind{
-        //   .{ .key = "\x1b[A", .handler = Self.selectMoreRecent }, // up
-        //   .{ .key = "\x1b[B", .handler = Self.selectLessRecent }, // down
-        //   .{ .key = "\x1b[C", .handler = Self.moveCursorRight }, // right
-        //   .{ .key = "\x1b[D", .handler = Self.moveCursorLeft }, // left
-        //};
-
-        const keybinds: []KeybindOf = [].{
+        const keybind_by_key = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, .{
+           .{ &[_]u8{3}, Self.cancel }, // ctrl-c
+           .{ &[_]u8{4}, Self.quit }, // ctrl-d
            .{ "\x1b[A", Self.selectMoreRecent }, // up
            .{ "\x1b[B", Self.selectLessRecent }, // down
            .{ "\x1b[C", Self.moveCursorRight }, // right
            .{ "\x1b[D", Self.moveCursorLeft }, // left
-        };
-
-        const keybind_by_key = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, &keybinds);
+        });
 
         // variables that are pretty much unchanged once initialized
         original_termios: std.os.termios,
@@ -256,33 +248,17 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const action = keybind_by_key.get(bytes) orelse return false;
             try action(self);
             return true;
+        }
 
-            // if (std.mem.eql(u8, bytes, &[_]u8{3})) { // ctrl-c
-            //     return error.Cancel;
-            // } else if (std.mem.eql(u8, bytes, &[_]u8{4})) { // ctrl-d
-            //     return error.Quit;
-            // } else if (std.mem.eql(u8, bytes, "\x1b[A")) { // up arrow
-            //     try self.selectLessRecent();
-            //     return true;
-            // } else if (std.mem.eql(u8, bytes, "\x1b[B")) { // down arrow
-            //     try self.selectMoreRecent();
-            //     return true;
-            // } else if (std.mem.eql(u8, bytes, "\x1b[C")) { // right arrow
-            //     try self.moveCursorRight();
-            //     return true;
-            // } else if (std.mem.eql(u8, bytes, "\x1b[D")) { // left arrow
-            //     try self.moveCursorLeft();
-            //     return true;
-            // }
+        fn quit(_: *Self) !void {
+            return error.Quit;
+        }
 
-            // TODO: handle other keybinds
-            // return false to skip appending key to input buffer
-
-            // return false;
+        fn cancel(_: *Self) !void {
+            return error.Cancel;
         }
 
         fn moveCursorLeft(self: *Self) !void {
-            // TODO: handle multi-byte characters
             const byte = self.pre_cursor_buffer.pop() orelse return;
             try self.prependPostCursorBuffer(&[_]u8{byte});
             try self.printf("\x1b[D", .{});
@@ -293,7 +269,6 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 return;
             }
 
-            // TODO: handle multi-byte characters
             const byte_after_cursor = self.post_cursor_buffer[self.post_cursor_position];
             try self.pre_cursor_buffer.append(byte_after_cursor);
             self.post_cursor_position += 1;
