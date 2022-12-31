@@ -23,7 +23,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind
-        const keybind_by_key = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, .{
+        const keybind_by_keypress = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, .{
            .{ &[_]u8{3}, Self.cancel }, // ctrl-c
            .{ &[_]u8{4}, Self.quit }, // ctrl-d
            .{ "\x1b[A", Self.selectMoreRecent }, // up
@@ -245,25 +245,28 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         // TODO: hash table
         // return true if handled, input will not be added to the input_buffer
         fn handleKeyBind(self: *Self, bytes: []const u8) !bool {
-            const action = keybind_by_key.get(bytes) orelse return false;
+            const action = keybind_by_keypress.get(bytes) orelse return false;
             try action(self);
             return true;
         }
 
+        /// keybind
         fn quit(_: *Self) !void {
             return error.Quit;
         }
-
+        /// keybind
         fn cancel(_: *Self) !void {
             return error.Cancel;
         }
 
+        /// keybind
         fn moveCursorLeft(self: *Self) !void {
             const byte = self.pre_cursor_buffer.pop() orelse return;
             try self.prependPostCursorBuffer(&[_]u8{byte});
             try self.printf("\x1b[D", .{});
         }
 
+        /// keybind
         fn moveCursorRight(self: *Self) !void {
             if (self.post_cursor_position == self.post_cursor_buffer.len) {
                 return;
@@ -275,12 +278,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             try self.printf("\x1b[C", .{});
         }
 
-        fn switchInputBuffer(self: *Self) void {
-            const tmp = self.pre_cursor_buffer;
-            self.pre_cursor_buffer = self.backup_buffer;
-            self.backup_buffer = tmp;
-        }
-
+        /// keybind
         fn selectLessRecent(self: *Self) !void {
             const history_selected = self.history_selected orelse {
                 self.history_selected = self.history.head orelse return;
@@ -296,6 +294,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             try self.reDraw();
         }
 
+        /// keybind
         fn selectMoreRecent(self: *Self) !void {
             const history_selected = self.history_selected orelse return;
             const more_recent_node = history_selected.prev orelse {
@@ -308,6 +307,12 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             self.history_selected = more_recent_node;
             try self.setInputBufferContent(more_recent_node.value.elems);
             try self.reDraw();
+        }
+
+        fn switchInputBuffer(self: *Self) void {
+            const tmp = self.pre_cursor_buffer;
+            self.pre_cursor_buffer = self.backup_buffer;
+            self.backup_buffer = tmp;
         }
 
         fn setInputBufferContent(self: *Self, content: []const u8) !void {
@@ -391,16 +396,4 @@ pub const Settings = struct {
 
 fn isEnd(byte: u8) bool {
     return byte == '\r';
-}
-
-// TODO: get terminal size
-// TODO: support utf-8 input?
-// TODO: log to file
-// TODO: handle tab character
-
-fn KeybindOf(comptime T: type) type {
-    return struct {
-        key: []const u8,
-        handler: fn(*T) anyerror!void,
-    };
 }
