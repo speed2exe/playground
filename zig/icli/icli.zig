@@ -26,8 +26,9 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         const keybind_by_keypress = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, .{
            .{ &[_]u8{3}, Self.cancel }, // ctrl-c
            .{ &[_]u8{4}, Self.quit }, // ctrl-d
-           .{ "\x1b[A", Self.selectMoreRecent }, // up
-           .{ "\x1b[B", Self.selectLessRecent }, // down
+           .{ &[_]u8{127}, Self.backspace }, // backspace
+           .{ "\x1b[A", Self.selectLessRecent }, // up
+           .{ "\x1b[B", Self.selectMoreRecent }, // down
            .{ "\x1b[C", Self.moveCursorRight }, // right
            .{ "\x1b[D", Self.moveCursorLeft }, // left
         });
@@ -40,16 +41,18 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         tty: File,
         isEndOfUserInput: *const fn(keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = comptime_settings.isEndOfUserInput,
 
-        // variables that are changed as the program runs
+        /// io buffered readers/writers
         input: RingBufferedReader,
         output: RingBufferedWriter,
+
+        /// history handling
+        /// (when user presses up or down to select previously executed commands)
         history: History,
         history_selected: ?*History.Node, // current history node that user is using
-        pre_cursor_buffer: array_list.Array(u8),
         backup_buffer: array_list.Array(u8),
 
-        /// variables handles user input buffer after cursor (when user change
-        /// cursor position by arrow keys)
+        /// pre and post cursor buffer handling
+        /// (when user change cursor position by left/right arrow keys, such that cursor is no longer at the end)
         /// initial_cursor_position: initial buffer length
         ///
         /// eg. [_, _, _, y, z]
@@ -60,9 +63,11 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         /// after user press right arrow key...
         /// valid: "z"
         /// post_cursor_position: 4
+        pre_cursor_buffer: array_list.Array(u8),
         post_cursor_buffer: []u8,
         post_cursor_position: usize,
 
+        /// file that collects all logs
         log_file: ?File,
 
         pub fn init(settings: Settings) !Self {
@@ -121,7 +126,6 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         pub fn run(self: *Self) !void {
             while (true) {
                 try self.printPrompt();
-
                 try self.readUserInput();
                 if (self.settings.execute(self.pre_cursor_buffer.getAll())) {
                     return;
@@ -173,7 +177,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             try self.log_to_file("readUserInput: waiting...\n",.{});
             try self.setRawInputMode();
             defer self.setOriginalInputMode() catch |err| {
-                self.printf("Failed to set original input mode: {any}", .{err}) catch unreachable;
+                self.log_to_file("Failed to set original input mode: {any}", .{err}) catch unreachable;
             };
 
             self.pre_cursor_buffer.truncate(0);
@@ -183,6 +187,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             while (true) {
                 const input = try self.input.readConst();
                 try self.log_to_file("read: {s}, bytes: {d}\n", .{ input, input });
+
                 const handled = try self.handleKeyBind(input);
                 if (handled) {
                     try self.log_to_file("handled keybind: {s}\n", .{input});
@@ -200,8 +205,10 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 _ = try self.output.write(input);
                 _ = try self.writePostCursorBuffer();
 
+                // TODO: consider async flushing
                 _ = try self.output.flush();
-                // TODO: generate autocomplete here?
+
+                // TODO: generate autocompletion after flush?
             }
         }
 
@@ -254,9 +261,17 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         fn quit(_: *Self) !void {
             return error.Quit;
         }
+
         /// keybind
         fn cancel(_: *Self) !void {
             return error.Cancel;
+        }
+
+        /// keybind
+        fn backspace(self: *Self) !void {
+            _ = self.pre_cursor_buffer.pop() orelse return;
+            try self.reDraw();
+            try self.printf("\x1b[D", .{});
         }
 
         /// keybind
@@ -327,11 +342,12 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             // move cursor to the beginning of the line & clear the line
             try self.printf("\r\x1b[K", .{});
             try self.printPrompt();
-            try self.printInputBuffer();
+            try self.printCurrentInput();
         }
 
-        inline fn printInputBuffer(self: *Self) !void {
-            try self.printf("{s}", .{self.pre_cursor_buffer.elems});
+        inline fn printCurrentInput(self: *Self) !void {
+            try self.printf("{s}", .{self.validPreCursorBuffer()});
+            try self.printf("{s}", .{self.validPostCursorBuffer()});
         }
 
         inline fn setRawInputMode(self: *Self) !void {
