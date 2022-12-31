@@ -21,13 +21,24 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, comptime_settings.input_buffer_size);
         const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), comptime_settings.history_size);
 
-        // Keybindings set up
-        // TODO: allow user to include
-        const Keybind = KeybindOf(Self);
-        const keybinds = []Keybind{
-            .{ .key = "h", .handler = Self.moveCursorLeft },
+        // Keybindings set up at comptime
+        // TODO: allow user to include their own custom keybind
+        // const Keybind = KeybindOf(Self);
+        // const keybinds = [_]Keybind{
+        //   .{ .key = "\x1b[A", .handler = Self.selectMoreRecent }, // up
+        //   .{ .key = "\x1b[B", .handler = Self.selectLessRecent }, // down
+        //   .{ .key = "\x1b[C", .handler = Self.moveCursorRight }, // right
+        //   .{ .key = "\x1b[D", .handler = Self.moveCursorLeft }, // left
+        //};
+
+        const keybinds: []KeybindOf = [].{
+           .{ "\x1b[A", Self.selectMoreRecent }, // up
+           .{ "\x1b[B", Self.selectLessRecent }, // down
+           .{ "\x1b[C", Self.moveCursorRight }, // right
+           .{ "\x1b[D", Self.moveCursorLeft }, // left
         };
-        const keybind_by_key = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, keybinds);
+
+        const keybind_by_key = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, &keybinds);
 
         // variables that are pretty much unchanged once initialized
         original_termios: std.os.termios,
@@ -242,28 +253,32 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         // TODO: hash table
         // return true if handled, input will not be added to the input_buffer
         fn handleKeyBind(self: *Self, bytes: []const u8) !bool {
-            if (std.mem.eql(u8, bytes, &[_]u8{3})) { // ctrl-c
-                return error.Cancel;
-            } else if (std.mem.eql(u8, bytes, &[_]u8{4})) { // ctrl-d
-                return error.Quit;
-            } else if (std.mem.eql(u8, bytes, "\x1b[A")) { // up arrow
-                try self.selectLessRecent();
-                return true;
-            } else if (std.mem.eql(u8, bytes, "\x1b[B")) { // down arrow
-                try self.selectMoreRecent();
-                return true;
-            } else if (std.mem.eql(u8, bytes, "\x1b[C")) { // right arrow
-                try self.moveCursorRight();
-                return true;
-            } else if (std.mem.eql(u8, bytes, "\x1b[D")) { // left arrow
-                try self.moveCursorLeft();
-                return true;
-            }
+            const action = keybind_by_key.get(bytes) orelse return false;
+            try action(self);
+            return true;
+
+            // if (std.mem.eql(u8, bytes, &[_]u8{3})) { // ctrl-c
+            //     return error.Cancel;
+            // } else if (std.mem.eql(u8, bytes, &[_]u8{4})) { // ctrl-d
+            //     return error.Quit;
+            // } else if (std.mem.eql(u8, bytes, "\x1b[A")) { // up arrow
+            //     try self.selectLessRecent();
+            //     return true;
+            // } else if (std.mem.eql(u8, bytes, "\x1b[B")) { // down arrow
+            //     try self.selectMoreRecent();
+            //     return true;
+            // } else if (std.mem.eql(u8, bytes, "\x1b[C")) { // right arrow
+            //     try self.moveCursorRight();
+            //     return true;
+            // } else if (std.mem.eql(u8, bytes, "\x1b[D")) { // left arrow
+            //     try self.moveCursorLeft();
+            //     return true;
+            // }
 
             // TODO: handle other keybinds
             // return false to skip appending key to input buffer
 
-            return false;
+            // return false;
         }
 
         fn moveCursorLeft(self: *Self) !void {
