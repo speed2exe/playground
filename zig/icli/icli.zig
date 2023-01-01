@@ -272,8 +272,15 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         /// keybind
         fn backspace(self: *Self) !void {
             _ = self.pre_cursor_buffer.pop() orelse return;
-            try self.reDraw();
-            try self.printf("\x1b[D", .{});
+            try self.printf("\x1b[D", .{}); // move cursor left
+
+            // handle post cursor buffer
+            const post_cursor_input = self.validPostCursorBuffer();
+            if (post_cursor_input.len > 0) {
+                try self.printf("\x1b[K", .{}); // clear from cursor to end of line
+                try self.printf("{s}", .{ self.validPostCursorBuffer() }); // print post cursor buffer
+                try self.printf("\x1b[{d}D", .{ self.validPostCursorBuffer().len }); // move cursor left proportionally to len of post cursor buffer
+            }
         }
 
         /// keybind
@@ -347,8 +354,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         inline fn printCurrentInput(self: *Self) !void {
-            try self.printf("{s}", .{self.validPreCursorBuffer()});
-            try self.printf("{s}", .{self.validPostCursorBuffer()});
+            try self.printf("{s}", .{ self.validPreCursorBuffer() });
+            try self.printf("{s}", .{ self.validPostCursorBuffer() });
         }
 
         inline fn setRawInputMode(self: *Self) !void {
