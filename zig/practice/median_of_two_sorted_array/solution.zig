@@ -30,14 +30,14 @@ fn findMedianSortedArray(arr1: []u64, arr2: []u64) u64 { // arr1: [2, 3, 5, 8], 
         const r_2 = if (pi2 == arr2.len) std.math.maxInt(u64) else arr2[pi2];
 
         if (l_1 > r_2) {
-            var steps = std.math.max(1, pi1/2);
+            var steps = std.math.max(1, pi1 / 2);
             pi1 -= steps;
             pi2 += steps;
             continue;
         }
 
         if (l_2 > r_1) {
-            var steps = std.math.max(1, (arr1.len - pi1)/2);
+            var steps = std.math.max(1, (arr1.len - pi1) / 2);
             pi1 += steps;
             pi2 -= steps;
             continue;
@@ -50,44 +50,36 @@ fn findMedianSortedArray(arr1: []u64, arr2: []u64) u64 { // arr1: [2, 3, 5, 8], 
     }
 }
 
-
 test "findMedianSortArrays" {
     {
-        var arr1 = [_]u64{2, 4, 6, 8, 10};
-        var arr2 = [_]u64{3, 5, 7, 9, 11, 13};
+        var arr1 = [_]u64{ 2, 4, 6, 8, 10 };
+        var arr2 = [_]u64{ 3, 5, 7, 9, 11, 13 };
         try testing.expectEqual(@as(u64, 7), findMedianSortedArray(&arr1, &arr2));
     }
     {
-        var arr1 = [_]u64{2, 4, 6, 8, 10};
-        var arr2 = [_]u64{3, 5, 7, 9, 11};
+        var arr1 = [_]u64{ 2, 4, 6, 8, 10 };
+        var arr2 = [_]u64{ 3, 5, 7, 9, 11 };
         try testing.expectEqual(@as(u64, 6), findMedianSortedArray(&arr1, &arr2));
         // 6.5 is the correct answer, but we're rounding down.
     }
     {
-        var arr1 = [_]u64{2, 3, 4, 8, 9, 10};
-        var arr2 = [_]u64{5, 6, 7};
+        var arr1 = [_]u64{ 2, 3, 4, 8, 9, 10 };
+        var arr2 = [_]u64{ 5, 6, 7 };
         try testing.expectEqual(@as(u64, 6), findMedianSortedArray(&arr1, &arr2));
         // 6.5 is the correct answer, but we're rounding down.
     }
     {
-        var arr1 = [_]u64{2, 3, 6, 7, 10, 11, 12};
-        var arr2 = [_]u64{4, 5, 8, 9};
+        var arr1 = [_]u64{ 2, 3, 6, 7, 10, 11, 12 };
+        var arr2 = [_]u64{ 4, 5, 8, 9 };
         try testing.expectEqual(@as(u64, 7), findMedianSortedArray(&arr1, &arr2));
         // 6.5 is the correct answer, but we're rounding down.
     }
 
     {
         // 1 to 50 sorted
-        var arr1 = [_]u64 {
-            11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-            21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+        var arr1 = [_]u64{ 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60 };
 
-            31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-            41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
-            51, 52, 53, 54, 55, 56, 57, 58, 59, 60
-        };
-
-        var arr2 = [_]u64 {
+        var arr2 = [_]u64{
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
         };
 

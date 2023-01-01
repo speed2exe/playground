@@ -19,7 +19,7 @@ pub fn MultiSlice(comptime T: type) type {
         slice_size: usize,
 
         pub fn initNumParts(elems: []T, num_parts: usize) Self {
-            return Self {
+            return Self{
                 .elems = elems,
                 .slice_size = elems.len / num_parts,
                 .len = num_parts,
@@ -27,7 +27,7 @@ pub fn MultiSlice(comptime T: type) type {
         }
 
         pub fn initMaxSize(elems: []T, max_size: usize) Self {
-            return Self {
+            return Self{
                 .elems = elems,
                 .slice_size = max_size,
                 .len = elems.len / max_size,
@@ -47,7 +47,6 @@ pub fn MultiSlice(comptime T: type) type {
         pub fn getIterator(self: Self) MultiSliceIterator(T) {
             return MultiSliceIterator(T).init(self);
         }
-
     };
 }
 
@@ -59,7 +58,7 @@ fn MultiSliceIterator(comptime T: type) type {
         consumed: usize = 0,
 
         fn init(multi_slice: MultiSlice(T)) Self {
-            return Self {
+            return Self{
                 .multi_slice = multi_slice,
             };
         }
@@ -76,7 +75,7 @@ fn MultiSliceIterator(comptime T: type) type {
 }
 
 test "test MultiSlice initNumParts" {
-    var elems = [_]u8{1,2,3,4,5,6,7};
+    var elems = [_]u8{ 1, 2, 3, 4, 5, 6, 7 };
     var elemss = MultiSlice(u8).initNumParts(&elems, 2);
     var part1 = elemss.getNthSlice(0);
     try expectEqual(@as([]u8, elems[0..3]), part1);
@@ -89,7 +88,7 @@ test "test MultiSlice initNumParts" {
 }
 
 test "test MultiSlice initMaxSize" {
-    var elems = [_]u8{1,2,3,4,5,6,7};
+    var elems = [_]u8{ 1, 2, 3, 4, 5, 6, 7 };
     var elemss = MultiSlice(u8).initMaxSize(&elems, 3);
     var part1 = elemss.getNthSlice(0);
     try expectEqual(@as([]u8, elems[0..3]), part1);
@@ -102,10 +101,10 @@ test "test MultiSlice initMaxSize" {
 }
 
 test "test MultiSlice iterator" {
-    var elems = [_]u8{1,2,3,4,5,6,7};
+    var elems = [_]u8{ 1, 2, 3, 4, 5, 6, 7 };
     var elemss = MultiSlice(u8).initNumParts(&elems, 2);
     var elemss_iterator = elemss.getIterator();
-    
+
     var part1 = elemss_iterator.next() orelse unreachable;
     try expectEqual(@as([]u8, elems[0..3]), part1);
 

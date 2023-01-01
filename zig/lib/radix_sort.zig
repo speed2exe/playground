@@ -10,23 +10,16 @@ pub fn main() !void {
     defer {
         const leaked = gpa.deinit();
         if (leaked) {
-            std.log.err("got leaked!",.{});
+            std.log.err("got leaked!", .{});
         }
     }
-    
-    var data = [_]u8 {
-        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
-        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
-        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
-        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
-        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
-        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
-    };
+
+    var data = [_]u8{ 86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17, 12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22, 85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63, 68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51, 32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24, 100, 41, 95, 73, 38, 30, 61, 59, 43, 5 };
 
     const now = std.time.nanoTimestamp();
     defer {
         const then = std.time.nanoTimestamp();
-        std.log.warn("quicksort nano sec: {d}",.{then - now});
+        std.log.warn("quicksort nano sec: {d}", .{then - now});
     }
 
     try radixSort(u8, u8Key, &data, allocator);
@@ -37,19 +30,12 @@ pub fn main() !void {
 }
 
 test "radix sort 100 elem rand order" {
-    var data = [_]u8 {
-        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
-        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
-        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
-        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
-        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
-        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
-    };
+    var data = [_]u8{ 86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17, 12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22, 85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63, 68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51, 32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24, 100, 41, 95, 73, 38, 30, 61, 59, 43, 5 };
 
     try radixSort(u8, u8Key, &data, test_allocator, 8);
 
     for (data) |d, i| {
-        try expectEqual(i+1, d);
+        try expectEqual(i + 1, d);
     }
 }
 
@@ -63,7 +49,7 @@ test "radix benchmark 2000,000" {
     const now = std.time.milliTimestamp();
     defer {
         const then = std.time.milliTimestamp();
-        std.log.warn("std.sort milli sec: {d}",.{then - now});
+        std.log.warn("std.sort milli sec: {d}", .{then - now});
     }
 
     try radixSort(u8, u8Key, &data, test_allocator, 8);
@@ -79,7 +65,7 @@ test "std.sort benchmark 2000,000" {
     const now = std.time.milliTimestamp();
     defer {
         const then = std.time.milliTimestamp();
-        std.log.warn("std.sort milli sec: {d}",.{then - now});
+        std.log.warn("std.sort milli sec: {d}", .{then - now});
     }
 
     std.sort.sort(u8, &data, @as(u8, 0), u8LessWithContex);
@@ -98,7 +84,7 @@ pub fn usizeKey(a: usize) usize {
     return a;
 }
 
-pub fn radixSort (
+pub fn radixSort(
     comptime T: type,
     keyFromElem: fn (T) usize,
     elems: []T,
@@ -114,7 +100,7 @@ pub fn radixSort (
     var radix_elems = try allocator.alloc(RadixElem(T), elems.len);
     defer allocator.free(radix_elems);
     for (elems) |elem, i| {
-        radix_elems[i] = RadixElem(T) {
+        radix_elems[i] = RadixElem(T){
             .index = i,
             .elem = elem,
             .key = keyFromElem(elem),
@@ -144,7 +130,7 @@ pub fn radixSort (
     var biggest_key = biggest_elem.key;
 
     var mask: usize = buckets_size;
-    while (biggest_key > 0): (biggest_key /= buckets_size) {
+    while (biggest_key > 0) : (biggest_key /= buckets_size) {
         // initialize all len to 0
         for (buckets_elem_len) |*len| {
             len.* = 0;
@@ -184,7 +170,7 @@ fn RadixElem(comptime T: type) type {
     };
 }
 
-fn higherKey(comptime T: type) fn(RadixElem(T), RadixElem(T)) bool {
+fn higherKey(comptime T: type) fn (RadixElem(T), RadixElem(T)) bool {
     return struct {
         fn function(a: RadixElem(T), b: RadixElem(T)) bool {
             return a.key > b.key;

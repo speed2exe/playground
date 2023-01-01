@@ -7,7 +7,7 @@ pub const StringReader = struct {
     pub const Reader = std.io.Reader(*StringReader, anyerror, read);
 
     pub fn init(data: []const u8) StringReader {
-        return StringReader {
+        return StringReader{
             .data = data,
         };
     }
@@ -23,7 +23,7 @@ pub const StringReader = struct {
     }
 
     pub fn reader(self: *StringReader) Reader {
-        return Reader { .context = self };
+        return Reader{ .context = self };
     }
 };
 

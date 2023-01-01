@@ -3,11 +3,10 @@ const testing = std.testing;
 const string_reader = @import("./string_reader.zig");
 const StringReader = string_reader.StringReader;
 
-pub fn RingBuffer (
+pub fn RingBuffer(
     comptime buffer_size: comptime_int,
 ) type {
     return struct {
-
         const Self = @This();
 
         buffer: [buffer_size]u8 = undefined,
@@ -20,7 +19,9 @@ pub fn RingBuffer (
         pub const Reader = std.io.Reader(*Self, anyerror, read);
         pub const Writer = std.io.Writer(*Self, anyerror, write);
 
-        pub fn init() Self { return Self {}; }
+        pub fn init() Self {
+            return Self{};
+        }
 
         pub fn reader(self: *Self) Reader {
             return .{ .context = self };
@@ -77,13 +78,13 @@ test "RingBuffer" {
     var ring_writer = ring.writer();
 
     {
-        var buf = [_]u8{0, 0, 0};
+        var buf = [_]u8{ 0, 0, 0 };
         const n = try ring_reader.read(&buf);
         try testing.expect(n == 0);
     }
     {
         const n = try ring_writer.write("hello");
-        var buf = [_]u8{0, 0, 0};
+        var buf = [_]u8{ 0, 0, 0 };
         const m = try ring_reader.read(&buf);
         try testing.expect(n == 5);
         try testing.expect(m == 3);
@@ -91,7 +92,7 @@ test "RingBuffer" {
     }
     {
         const n = try ring_writer.write("0123456789");
-        var buf = [_]u8{0, 0, 0};
+        var buf = [_]u8{ 0, 0, 0 };
         const m = try ring_reader.read(&buf);
         try testing.expect(n == 7);
         try testing.expect(m == 3);
@@ -99,7 +100,7 @@ test "RingBuffer" {
         try testing.expectEqualSlices(u8, &ring.buffer, "56llo01234");
     }
     {
-        var buf = [_]u8{0, 0, 0, 0, 0 ,0 ,0, 0, 0, 0};
+        var buf = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
         const n = try ring_reader.read(&buf);
         try testing.expect(n == 6);
         try testing.expectEqualSlices(u8, buf[0..n], "123456");
@@ -112,7 +113,9 @@ fn ringRead(dest: []u8, src: []u8, head_ptr: *usize, tail: usize) usize {
         return 0;
     }
 
-    defer { head_ptr.* = head; }
+    defer {
+        head_ptr.* = head;
+    }
 
     if (tail > head) {
         const n = copy(dest, src[head..tail]);
@@ -133,8 +136,8 @@ fn ringRead(dest: []u8, src: []u8, head_ptr: *usize, tail: usize) usize {
 }
 
 test "ringRead - 1" {
-    var dest = [_]u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    var dest = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    var src = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     var head: usize = 0;
     var tail: usize = 10;
     const n = ringRead(&dest, &src, &head, tail);
@@ -145,70 +148,70 @@ test "ringRead - 1" {
 }
 
 test "ringRead - 2" {
-    var dest = [_]u8{0, 0, 0, 0, 0};
-    var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    var dest = [_]u8{ 0, 0, 0, 0, 0 };
+    var src = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     var head: usize = 1;
     var tail: usize = 10;
 
     const n = ringRead(&dest, &src, &head, tail);
 
-    var expected_dest  = [_]u8{1, 2, 3, 4, 5};
+    var expected_dest = [_]u8{ 1, 2, 3, 4, 5 };
     try testing.expectEqualSlices(u8, &dest, &expected_dest);
     try testing.expect(head == 6);
     try testing.expect(n == 5);
 }
 
 test "ringRead - 3" {
-    var dest = [_]u8{0, 0, 0, 0, 0};
-    var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    var dest = [_]u8{ 0, 0, 0, 0, 0 };
+    var src = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     var head: usize = 1;
     var tail: usize = 4;
 
     const n = ringRead(&dest, &src, &head, tail);
 
-    var expected_dest  = [_]u8{1, 2, 3, 0, 0};
+    var expected_dest = [_]u8{ 1, 2, 3, 0, 0 };
     try testing.expectEqualSlices(u8, &dest, &expected_dest);
     try testing.expect(head == 4);
     try testing.expect(n == 3);
 }
 
 test "ringRead - 4" {
-    var dest = [_]u8{0, 0, 0, 0, 0};
-    var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    var dest = [_]u8{ 0, 0, 0, 0, 0 };
+    var src = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     var head: usize = 4;
     var tail: usize = 4;
 
     const n = ringRead(&dest, &src, &head, tail);
 
-    var expected_dest  = [_]u8{0, 0, 0, 0, 0};
+    var expected_dest = [_]u8{ 0, 0, 0, 0, 0 };
     try testing.expectEqualSlices(u8, &dest, &expected_dest);
     try testing.expect(head == 4);
     try testing.expect(n == 0);
 }
 
 test "ringRead - 5" {
-    var dest = [_]u8{0, 0, 0, 0, 0};
-    var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    var dest = [_]u8{ 0, 0, 0, 0, 0 };
+    var src = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     var head: usize = 8;
     var tail: usize = 2;
 
     const n = ringRead(&dest, &src, &head, tail);
 
-    var expected_dest  = [_]u8{8, 9, 0, 1, 0};
+    var expected_dest = [_]u8{ 8, 9, 0, 1, 0 };
     try testing.expectEqualSlices(u8, &dest, &expected_dest);
     try testing.expect(head == 2);
     try testing.expect(n == 4);
 }
 
 test "ringRead - 6" {
-    var dest = [_]u8{0, 0, 0, 0, 0};
-    var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    var dest = [_]u8{ 0, 0, 0, 0, 0 };
+    var src = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     var head: usize = 8;
     var tail: usize = 7;
 
     const n = ringRead(&dest, &src, &head, tail);
 
-    var expected_dest  = [_]u8{8, 9, 0, 1, 2};
+    var expected_dest = [_]u8{ 8, 9, 0, 1, 2 };
     try testing.expectEqualSlices(u8, &dest, &expected_dest);
     try testing.expect(head == 3);
     try testing.expect(n == 5);
@@ -217,7 +220,9 @@ test "ringRead - 6" {
 fn ringWrite(src: []const u8, dest: []u8, head_ptr: *usize, tail_ptr: *usize) usize {
     var tail = tail_ptr.*;
     const head = head_ptr.*;
-    defer { tail_ptr.* = tail; }
+    defer {
+        tail_ptr.* = tail;
+    }
 
     if (head == tail) {
         head_ptr.* = 0;
@@ -229,26 +234,26 @@ fn ringWrite(src: []const u8, dest: []u8, head_ptr: *usize, tail_ptr: *usize) us
         var n = copy(dest[tail..], src);
         tail += n;
         if (tail == dest.len and head > 1) {
-            tail = copy(dest[0..head - 1], src[n..]);
+            tail = copy(dest[0 .. head - 1], src[n..]);
             n += tail;
         }
         return n;
     }
 
-    const n = copy(dest[tail..head - 1], src);
+    const n = copy(dest[tail .. head - 1], src);
     tail += n;
     return n;
 }
 
 test "ringWrite - 1" {
-    var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    var dest = [_]u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    var src = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    var dest = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     var head: usize = 5;
     var tail: usize = 5;
 
     const n = ringWrite(&src, &dest, &head, &tail);
 
-    const expected_dest = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    const expected_dest = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     try testing.expectEqualSlices(u8, &dest, &expected_dest);
     try testing.expect(tail == 10);
     try testing.expect(head == 0);
@@ -256,56 +261,56 @@ test "ringWrite - 1" {
 }
 
 test "ringWrite - 2" {
-    var src  = [_]u8{0, 1, 2, 3, 4};
-    var dest = [_]u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    var src = [_]u8{ 0, 1, 2, 3, 4 };
+    var dest = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     var head: usize = 5;
     var tail: usize = 5;
 
     const n = ringWrite(&src, &dest, &head, &tail);
 
-    const expected_dest = [_]u8{0, 1, 2, 3, 4};
+    const expected_dest = [_]u8{ 0, 1, 2, 3, 4 };
     try testing.expectEqualSlices(u8, dest[0..n], &expected_dest);
     try testing.expect(tail == 5);
     try testing.expect(n == 5);
 }
 
 test "ringWrite - 3" {
-    var src  = [_]u8{0, 1, 2, 3, 4};
-    var dest = [_]u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    var src = [_]u8{ 0, 1, 2, 3, 4 };
+    var dest = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     var head: usize = 2;
     var tail: usize = 3;
 
     const n = ringWrite(&src, &dest, &head, &tail);
 
-    const expected_dest = [_]u8{0, 0, 0, 0, 1, 2, 3, 4, 0, 0};
+    const expected_dest = [_]u8{ 0, 0, 0, 0, 1, 2, 3, 4, 0, 0 };
     try testing.expectEqualSlices(u8, &dest, &expected_dest);
     try testing.expect(tail == 8);
     try testing.expect(n == 5);
 }
 
 test "ringWrite - 4" {
-    var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    var dest = [_]u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    var src = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    var dest = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     var head: usize = 3;
     var tail: usize = 4;
 
     const n = ringWrite(&src, &dest, &head, &tail);
 
-    const expected_dest = [_]u8{6, 7, 0, 0, 0, 1, 2, 3, 4, 5};
+    const expected_dest = [_]u8{ 6, 7, 0, 0, 0, 1, 2, 3, 4, 5 };
     try testing.expectEqualSlices(u8, &dest, &expected_dest);
     try testing.expect(tail == 2);
     try testing.expect(n == 8);
 }
 
 test "ringWrite - 5" {
-    var src  = [_]u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    var dest = [_]u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    var src = [_]u8{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    var dest = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     var head: usize = 7;
     var tail: usize = 2;
 
     const n = ringWrite(&src, &dest, &head, &tail);
 
-    const expected_dest = [_]u8{0, 0, 0, 1, 2, 3, 0, 0, 0, 0};
+    const expected_dest = [_]u8{ 0, 0, 0, 1, 2, 3, 0, 0, 0, 0 };
     try testing.expectEqualSlices(u8, &dest, &expected_dest);
     try testing.expect(tail == 6);
     try testing.expect(n == 4);
@@ -322,30 +327,30 @@ fn copy(dest: []u8, src: []const u8) usize {
 }
 
 test "test copy" {
-    var dest = [_]u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    var src = [_]u8{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    var dest = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    var src = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
     const copied = copy(&dest, &src);
     try testing.expect(copied == 16);
     try testing.expectEqualSlices(u8, &dest, &src);
 }
 
 test "test copy 2" {
-    var dest = [_]u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    var src = [_]u8{1, 2, 3, 4, 5};
+    var dest = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    var src = [_]u8{ 1, 2, 3, 4, 5 };
     const copied = copy(&dest, &src);
     try testing.expect(copied == 5);
 
-    var expected = [_]u8{1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    var expected = [_]u8{ 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     try testing.expectEqualSlices(u8, &dest, &expected);
 }
 
 test "test copy 3" {
-    var dest = [_]u8{0, 0, 0, 0, 0};
-    var src = [_]u8{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    var dest = [_]u8{ 0, 0, 0, 0, 0 };
+    var src = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
     const copied = copy(&dest, &src);
     try testing.expect(copied == 5);
 
-    var expected = [_]u8{1, 2, 3, 4, 5};
+    var expected = [_]u8{ 1, 2, 3, 4, 5 };
     try testing.expectEqualSlices(u8, &dest, &expected);
 }
 
@@ -358,7 +363,9 @@ fn ringUnreadBytes(head: usize, tail: usize, len: usize) usize {
 
 fn ringReadConst(buffer: []u8, head_ptr: *usize, tail: usize) []const u8 {
     var head = head_ptr.*;
-    defer { head_ptr.* = head; }
+    defer {
+        head_ptr.* = head;
+    }
 
     if (tail > head) {
         const view = buffer[head..tail];
@@ -381,7 +388,9 @@ fn ringReadFrom(
 ) ReaderType.Error!usize {
     var tail = tail_ptr.*;
     const head = head_ptr.*;
-    defer { tail_ptr.* = tail; }
+    defer {
+        tail_ptr.* = tail;
+    }
 
     if (head == tail) {
         head_ptr.* = 0;
@@ -393,13 +402,13 @@ fn ringReadFrom(
         var n = try reader.read(buffer[tail..]);
         tail += n;
         if (tail == buffer.len and head > 1) {
-            tail = try reader.read(buffer[0..head - 1]);
+            tail = try reader.read(buffer[0 .. head - 1]);
             n += tail;
         }
         return n;
     }
 
-    const n = try reader.read(buffer[tail..head - 1]);
+    const n = try reader.read(buffer[tail .. head - 1]);
     tail += n;
     return n;
 }
@@ -416,19 +425,15 @@ test "test readFrom" {
     }
 }
 
-fn ringWriteTo(
-    comptime WriterType: type,
-    writer: WriterType,
-    buffer: []const u8,
-    head_ptr: *usize,
-    tail: usize
-) WriterType.Error!usize {
+fn ringWriteTo(comptime WriterType: type, writer: WriterType, buffer: []const u8, head_ptr: *usize, tail: usize) WriterType.Error!usize {
     var head = head_ptr.*;
     if (tail == head) {
         return 0;
     }
 
-    defer { head_ptr.* = head; }
+    defer {
+        head_ptr.* = head;
+    }
 
     if (tail > head) {
         const n = try writer.write(buffer[head..tail]);
@@ -456,7 +461,10 @@ test "test writeTo" {
 
     var buffer: [10]u8 = undefined;
     const fbs_t = std.io.FixedBufferStream([]u8);
-    var fbs = fbs_t{ .buffer = &buffer, .pos = 0, };
+    var fbs = fbs_t{
+        .buffer = &buffer,
+        .pos = 0,
+    };
 
     {
         const n = try ring_buffer.writeTo(fbs_t.Writer, fbs.writer());
@@ -476,7 +484,10 @@ test "test writeTo - 2" {
 
     var buffer: [10]u8 = undefined;
     const fbs_t = std.io.FixedBufferStream([]u8);
-    var fbs = fbs_t{ .buffer = &buffer, .pos = 0, };
+    var fbs = fbs_t{
+        .buffer = &buffer,
+        .pos = 0,
+    };
 
     {
         const n = try ring_buffer.writeTo(fbs_t.Writer, fbs.writer());

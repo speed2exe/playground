@@ -29,13 +29,13 @@ fn u32Less(a: u32, b: u32) bool {
 }
 
 test "binarySearch" {
-    const elems = [_]u32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 };
+    const elems = [_]u32{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 };
     const target: u32 = 5;
     try testing.expectEqual(@as(usize, 4), binarySearch(u32, u32Less, elems[0..], target));
 }
 
 test "binarySearch" {
-    const elems = [_]u32{0, 1, 2, 3, 4};
+    const elems = [_]u32{ 0, 1, 2, 3, 4 };
     const target: u32 = 5;
     try testing.expectEqual(@as(usize, 4), binarySearch(u32, u32Less, elems[0..], target));
 }

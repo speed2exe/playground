@@ -5,7 +5,7 @@ const atomic = std.atomic;
 // It is a blocking queue that can be used to send and receive data.
 // It is safe to use from multiple threads.
 // Lock-free
-pub fn Channel (
+pub fn Channel(
     comptime T: type,
     comptime size: usize,
 ) type {
@@ -24,18 +24,17 @@ pub fn Channel (
         recv_queue_number: atomic.Atomic(usize),
 
         pub fn init() Self {
-           return Self{
-               .buffer = [_]T{undefined} ** size,
-               .read_pos = atomic.Atomic(usize).init(0),
-               .len = atomic.Atomic(usize).init(size),
-               .send_queue_number = atomic.Atomic(usize).init(0),
-               .recv_queue_number = atomic.Atomic(usize).init(0),
-           };
+            return Self{
+                .buffer = [_]T{undefined} ** size,
+                .read_pos = atomic.Atomic(usize).init(0),
+                .len = atomic.Atomic(usize).init(size),
+                .send_queue_number = atomic.Atomic(usize).init(0),
+                .recv_queue_number = atomic.Atomic(usize).init(0),
+            };
         }
-        
+
         pub fn send(self: *Self, item: T) void {
             @atomicRmw(usize, &self.send_queue_number, .Add, 1, .Acquire);
-
 
             // @cmpxchgStrong
         }
@@ -46,12 +45,9 @@ pub fn Channel (
         //     // get a queue number
         //     self.send_queue_number
 
-
         //     // Wait until there is space in the buffer.
         //     std.Thread.Futex.wait(&self.counter, buffer.len, null);
         //     std.atomic.Queue
-
-
 
         //     // Wait until there is space in the buffer.
 

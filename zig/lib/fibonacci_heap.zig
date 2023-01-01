@@ -13,19 +13,12 @@ pub fn main() !void {
     defer {
         const leaked = gpa.deinit();
         if (leaked) {
-            std.log.err("got leaked!",.{});
+            std.log.err("got leaked!", .{});
         }
     }
 
     // 1 to 100 random order
-    const data = [_]u8 {
-        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
-        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
-        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
-        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
-        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
-        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
-    };
+    const data = [_]u8{ 86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17, 12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22, 85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63, 68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51, 32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24, 100, 41, 95, 73, 38, 30, 61, 59, 43, 5 };
 
     // initialised a fib. heap
     // put all data
@@ -37,9 +30,8 @@ pub fn main() !void {
     // std.debug.print("{}",.{fib_heap});
 
     // const data = [_]u8 {
-        // 86, 53, 13, 36, 8, 71,
+    // 86, 53, 13, 36, 8, 71,
     // };
-
 
     for (data) |value| {
         try fib_heap.insert(value);
@@ -62,17 +54,10 @@ test "FibonacciHeap 100 random u8" {
     const now = std.time.nanoTimestamp();
     defer {
         const then = std.time.nanoTimestamp();
-        std.log.warn("nano sec: {d}",.{then - now});
+        std.log.warn("nano sec: {d}", .{then - now});
     }
 
-    const data = [_]u8 {
-        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
-        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
-        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
-        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
-        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
-        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
-    };
+    const data = [_]u8{ 86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17, 12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22, 85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63, 68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51, 32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24, 100, 41, 95, 73, 38, 30, 61, 59, 43, 5 };
 
     // initialize the data structure
     var fib_heap = FibonacciHeap(u8).init(test_allocator, u8Less);
@@ -93,17 +78,10 @@ test "PQueue 100 random u8" {
     const now = std.time.nanoTimestamp();
     defer {
         const then = std.time.nanoTimestamp();
-        std.log.warn("nano sec: {d}",.{then - now});
+        std.log.warn("nano sec: {d}", .{then - now});
     }
 
-    const data = [_]u8 {
-        86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17,
-        12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22,
-        85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63,
-        68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51,
-        32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24,
-        100, 41, 95, 73, 38, 30, 61, 59, 43, 5
-    };
+    const data = [_]u8{ 86, 53, 13, 36, 8, 64, 65, 1, 90, 14, 25, 79, 70, 98, 54, 55, 6, 17, 12, 77, 46, 49, 82, 58, 26, 89, 48, 83, 27, 42, 80, 97, 52, 39, 76, 22, 85, 9, 29, 11, 2, 20, 66, 87, 40, 50, 35, 15, 92, 74, 78, 67, 28, 63, 68, 62, 23, 94, 75, 96, 69, 88, 99, 44, 16, 91, 72, 33, 84, 45, 34, 51, 32, 37, 7, 47, 31, 57, 93, 21, 19, 10, 4, 81, 3, 71, 18, 56, 60, 24, 100, 41, 95, 73, 38, 30, 61, 59, 43, 5 };
 
     var q = std.PriorityQueue(u8, u8, u8LessWithContext).init(test_allocator, @as(u8, 1));
     defer q.deinit();
@@ -169,19 +147,19 @@ pub fn FibonacciHeap(comptime T: type) type {
         // null, if already calculated
         staging_index: ?usize,
 
-        less: fn(a: T, b: T) bool,
+        less: fn (a: T, b: T) bool,
 
-        pub fn init (
-           allocator: std.mem.Allocator,
-           less: fn(a: T, b: T) bool,
+        pub fn init(
+            allocator: std.mem.Allocator,
+            less: fn (a: T, b: T) bool,
         ) Self {
-           return Self {
-               .allocator = allocator,
-               .bucketed_roots = ArrayList(?FibonacciNode(T)).init(allocator),
-               .unbucketed_roots = ArrayList(FibonacciNode(T)).init(allocator),
-               .staging_index = null,
-               .less = less,
-           };
+            return Self{
+                .allocator = allocator,
+                .bucketed_roots = ArrayList(?FibonacciNode(T)).init(allocator),
+                .unbucketed_roots = ArrayList(FibonacciNode(T)).init(allocator),
+                .staging_index = null,
+                .less = less,
+            };
         }
 
         // deinitialized this data structure
@@ -191,7 +169,7 @@ pub fn FibonacciHeap(comptime T: type) type {
                 root.deinit();
             }
             self.bucketed_roots.deinit();
-            
+
             for (self.unbucketed_roots.items) |*root| {
                 root.deinit();
             }
@@ -200,9 +178,9 @@ pub fn FibonacciHeap(comptime T: type) type {
 
         // Return key of the highest Priority
         pub fn peek(self: *Self) !?T {
-           const node_opt = try self.peekStaging();
-           const node = node_opt orelse return null;
-           return node.key;
+            const node_opt = try self.peekStaging();
+            const node = node_opt orelse return null;
+            return node.key;
         }
 
         // Key must still be valid for the whole lifetime of this structure
@@ -231,7 +209,7 @@ pub fn FibonacciHeap(comptime T: type) type {
         }
 
         fn stageIndexIfNull(self: *Self) !void {
-            if (self.staging_index == null)  {
+            if (self.staging_index == null) {
                 try self.stageIndex();
             }
         }
@@ -256,8 +234,8 @@ pub fn FibonacciHeap(comptime T: type) type {
                 return;
             }
 
-            {   // iterate over all the other buckets, find node with lowest value
-                var index = min_index; 
+            { // iterate over all the other buckets, find node with lowest value
+                var index = min_index;
                 while (index < self.bucketed_roots.items.len) : (index += 1) {
                     const node = self.bucketed_roots.items[index] orelse continue;
                     const key = node.key;
@@ -286,7 +264,7 @@ pub fn FibonacciHeap(comptime T: type) type {
                 // print("inserted at {d} degree\n",.{degree});
             }
 
-            while (true): (degree += 1) { 
+            while (true) : (degree += 1) {
 
                 // check if node already existed in bucketed_roots with degree
                 // not exists => just put new node and return
@@ -304,7 +282,7 @@ pub fn FibonacciHeap(comptime T: type) type {
                 if (self.less(node.key, existing_node.key)) {
                     try node.add_child(existing_node);
                     continue;
-                } 
+                }
                 try existing_node.add_child(node.*);
                 node.* = existing_node;
             }
@@ -328,7 +306,7 @@ fn FibonacciNode(comptime T: type) type {
         children: ArrayList(FibonacciNode(T)),
 
         fn init(allocator: std.mem.Allocator, key: T) Self {
-            return Self {
+            return Self{
                 .key = key,
                 .children = ArrayList(FibonacciNode(T)).init(allocator),
             };

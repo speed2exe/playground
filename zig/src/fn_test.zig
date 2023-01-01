@@ -1,4 +1,4 @@
-// 
+//
 const std = @import("std");
 
 pub fn main() void {
@@ -18,42 +18,52 @@ pub fn main() void {
 
     {
         // create a function on the fly
-        var b: fn() void = struct {fn customFunc() void {
-            std.log.info("in custom func", .{});
-        }}.customFunc;
+        var b: fn () void = struct {
+            fn customFunc() void {
+                std.log.info("in custom func", .{});
+            }
+        }.customFunc;
         b();
     }
 
     // create fn and call it on the fly
-    defer struct {fn f() void {
-        std.log.info("deferred create and call", .{});
-    }}.f();
+    defer struct {
+        fn f() void {
+            std.log.info("deferred create and call", .{});
+        }
+    }.f();
 
     // as tuple
     {
-        struct {fn _() void {
-            std.log.info("create and call", .{});
-        }}._();
+        struct {
+            fn _() void {
+                std.log.info("create and call", .{});
+            }
+        }._();
     }
- 
+
     // unable to do
     //var c: fn() void = .{fn customFunc() void {
-        //std.log.info("in custom func", .{}),
+    //std.log.info("in custom func", .{}),
     //}};
     //_ = c;
     //std.log.info("type of c {s}", .{@TypeOf(c)});
 
     // takes in anonFunc
-    takeInFunc(struct {fn _() void {
-        std.log.info("tooked in this anon func", .{});
-    }}._);
+    takeInFunc(struct {
+        fn _() void {
+            std.log.info("tooked in this anon func", .{});
+        }
+    }._);
 
     {
         var oneTimeStruct = .{
             .a = @as(u32, 1324),
-            .b = struct {fn _() void {
-                std.log.info("calling b in one time struct {}", .{.a = .a});
-            }}._,
+            .b = struct {
+                fn _() void {
+                    std.log.info("calling b in one time struct {}", .{ .a = .a });
+                }
+            }._,
             .c = sayHi,
         };
         std.log.info("one time struct {}", .{oneTimeStruct});
@@ -73,13 +83,10 @@ pub fn main() void {
             // fill me!!!
         };
     }
-    {
-
-
-    }
+    {}
 }
 
-fn takeInFunc(f: fn() void) void {
+fn takeInFunc(f: fn () void) void {
     f();
 }
 
@@ -87,7 +94,7 @@ fn sayHi() void {
     std.log.info("hi there!", .{});
 }
 
-fn returnAFunc() fn() void {
+fn returnAFunc() fn () void {
     return sayHi;
 }
 

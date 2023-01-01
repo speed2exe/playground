@@ -8,8 +8,11 @@ pub fn main() !void {
 
     std.io.BufferedReader(4096, input);
 
-    input.readUntilDelimiterOrEofAlloc(allocator, '\n', );
-    
+    input.readUntilDelimiterOrEofAlloc(
+        allocator,
+        '\n',
+    );
+
     // stream from std input
     std.debug.print("{d}", .{result});
 }

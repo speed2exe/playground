@@ -15,7 +15,7 @@ const Instruction = enum {
 };
 
 const Facing = enum {
-    forward, 
+    forward,
     backward,
     left,
     right,
@@ -114,11 +114,9 @@ fn evaluateRelativeFinalPosition(instructions: []const Instruction) EvalResult {
         }
     }
 
-    return EvalResult {
+    return EvalResult{
         .facing = facing,
         .relative_X = pos_X,
         .relative_Y = pos_Y,
     };
 }
-
-

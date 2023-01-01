@@ -17,7 +17,6 @@ const myType = struct {
 
     fn goodbye(self: *myType) void {
         _ = self;
-        print("before return from goodbye fn",.{});
+        print("before return from goodbye fn", .{});
     }
-    
 };

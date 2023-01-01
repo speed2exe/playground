@@ -5,7 +5,7 @@ pub fn Iterator(comptime T: type) type {
         elems: []T,
 
         pub fn init(elems: []T) Self {
-            return Self {
+            return Self{
                 .elems = elems,
             };
         }

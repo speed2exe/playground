@@ -12,7 +12,7 @@ pub fn LineReader(comptime ReaderType: type, comptime initial_size: usize) type 
         src: ReaderType,
 
         pub fn init(r: ReaderType) Self {
-            return Self { .src = r };
+            return Self{ .src = r };
         }
 
         /// readLine reads a line from the reader.

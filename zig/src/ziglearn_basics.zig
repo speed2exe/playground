@@ -34,7 +34,6 @@ pub fn main() void {
         //     @typeName(@TypeOf(c_def)), c_def,
         // });
 
-
     }
     {
         // TODO: find out const[5]u8 and []u8 "hello"
@@ -49,7 +48,7 @@ pub fn main() void {
         // });
 
         // extra b[4], which is termination
-        var a: [3:0]u8 = .{3,2,1};
+        var a: [3:0]u8 = .{ 3, 2, 1 };
         std.log.info("type of a: {s}, len of a: {}, value of a: {d}, 4th: {d}", .{
             @typeName(@TypeOf(a)), a.len, a, a[3],
         });
@@ -60,7 +59,7 @@ pub fn main() void {
         // });
     }
     {
-        var data = [_]u8{1, 2, 3};
+        var data = [_]u8{ 1, 2, 3 };
 
         // value capture
         // not mutable
@@ -107,7 +106,7 @@ pub fn main() void {
     }
     {
         // for loop without break will trigger else block
-        for ([_]u0{0}**10) |_, i| {
+        for ([_]u0{0} ** 10) |_, i| {
             _ = i;
         } else {
             std.log.info("for loop executed without break", .{});
@@ -146,7 +145,7 @@ pub fn main() void {
         });
     }
     {
-        var value :f32 = 0x1p3; // p7 means *(2^7)
+        var value: f32 = 0x1p3; // p7 means *(2^7)
         std.log.info("float value: {}", .{value});
     }
     {
@@ -160,9 +159,9 @@ pub fn main() void {
         });
     }
     {
-        var result = Result{.int = 1234};
+        var result = Result{ .int = 1234 };
         std.log.info("type of result: {s}, value of result.int: {d}", .{
-            @typeName(@TypeOf(result)), result.int
+            @typeName(@TypeOf(result)), result.int,
             // Note: accessing other fields result in panic
         });
         // how to check the actual underlying type: use tagged union
@@ -173,63 +172,53 @@ pub fn main() void {
 
         var b: i32 = 1;
         var a: *i32 = &b;
-        std.log.info("type of a: {s}, type of pointer to a: {s}, value of a: {d}", .{
-            @typeName(@TypeOf(a)), @typeName(@TypeOf(a.*)), a
-        });
+        std.log.info("type of a: {s}, type of pointer to a: {s}, value of a: {d}", .{ @typeName(@TypeOf(a)), @typeName(@TypeOf(a.*)), a });
     }
     {
-        var thing = &Stuff {
+        var thing = &Stuff{
             .x = 10,
             .y = 20,
         };
-        std.log.info("type of thing: {s}, type of pointer to thing: {s}, value of thing: {d}", .{
-            @typeName(@TypeOf(thing)), @typeName(@TypeOf(thing.*)), thing
-        });
+        std.log.info("type of thing: {s}, type of pointer to thing: {s}, value of thing: {d}", .{ @typeName(@TypeOf(thing)), @typeName(@TypeOf(thing.*)), thing });
     }
     {
         var a: usize = 3;
-        const array = [_]u8{1, 2, 3, 4, 5};
+        const array = [_]u8{ 1, 2, 3, 4, 5 };
         const sliceToEnd = array[a..];
         std.log.info("type of sliceToEnd: {s}, value of sliceToEnd: {d}", .{
-            @typeName(@TypeOf(sliceToEnd)),  sliceToEnd // []const u8, {1, 2, 3}
+            @typeName(@TypeOf(sliceToEnd)), sliceToEnd, // []const u8, {1, 2, 3}
         });
         // Note: slice from start is array[0..X]
-    }{
+    }
+    {
         var a: usize = 3;
-        const array = [_]u8{1, 2, 3, 4, 5};
+        const array = [_]u8{ 1, 2, 3, 4, 5 };
         const slice = array[0..a];
         std.log.info("type of slice: {s}, value of slice: {d}", .{
-            @typeName(@TypeOf(slice)),  slice // []const u8, {1, 2, 3}
+            @typeName(@TypeOf(slice)), slice, // []const u8, {1, 2, 3}
         });
 
         const elem = slice[1];
-        std.log.info("type of elem: {s}, value of elem: {d}", .{
-            @typeName(@TypeOf(elem)),  elem
-        });
+        std.log.info("type of elem: {s}, value of elem: {d}", .{ @typeName(@TypeOf(elem)), elem });
     }
     {
         // comptime optimization, slice type is promoted to pointer to array
-        const array = [_]u8{1, 2, 3, 4, 5};
+        const array = [_]u8{ 1, 2, 3, 4, 5 };
         const slice = array[0..3];
         std.log.info("type of slice: {s}, value of slice: {d}", .{
-            @typeName(@TypeOf(slice)),  slice.* // *const [3]u8, {1, 2, 3}
+            @typeName(@TypeOf(slice)), slice.*, // *const [3]u8, {1, 2, 3}
         });
 
         const elem = slice[1];
-        std.log.info("type of elem: {s}, value of elem: {d}", .{
-            @typeName(@TypeOf(elem)),  elem
-        });
+        std.log.info("type of elem: {s}, value of elem: {d}", .{ @typeName(@TypeOf(elem)), elem });
     }
     {
         // [*]T Array of pointers
         // *[]T pointer to array
 
         // find out syntax for pointer to a list
-        const a: [2]u8 = .{1, 2};
-        std.log.info("type of a: {s}, pointer_type: {s}, value of a: {d}", .{
-            @typeName(@TypeOf(a)), @typeName(@TypeOf(&a)), a
-        });
-
+        const a: [2]u8 = .{ 1, 2 };
+        std.log.info("type of a: {s}, pointer_type: {s}, value of a: {d}", .{ @typeName(@TypeOf(a)), @typeName(@TypeOf(&a)), a });
     }
     {
         // usize and isize (platform dependent)
@@ -243,11 +232,10 @@ pub fn main() void {
         // illegal deference
         // do not do this
         var a: i64 = 8;
-        const p_a :*i64 = &a;
+        const p_a: *i64 = &a;
         const p_b = @ptrToInt(p_a);
         const p_c = @intToPtr(*i64, p_b + @sizeOf(i64));
-        std.log.info("type of p_c: {s}, value of p_c: {}", 
-        .{@typeName(@TypeOf(p_c)), p_c.*});
+        std.log.info("type of p_c: {s}, value of p_c: {}", .{ @typeName(@TypeOf(p_c)), p_c.* });
     }
 
     {
@@ -256,8 +244,7 @@ pub fn main() void {
         var index: u8 = 5;
         const b = a[index];
         // undefined value for b
-        std.log.info("type of b: {s}, value of x: {b}",
-        .{@typeName(@TypeOf(b)), b});
+        std.log.info("type of b: {s}, value of x: {b}", .{ @typeName(@TypeOf(b)), b });
     }
 
     {
@@ -271,40 +258,37 @@ pub fn main() void {
     }
 
     {
-        const x = .{1, "hello"}; // anonymous struct
-        std.log.info("type of x: {s}, value of x: {s}",
-        .{@typeName(@TypeOf(x)), x});
+        const x = .{ 1, "hello" }; // anonymous struct
+        std.log.info("type of x: {s}, value of x: {s}", .{ @typeName(@TypeOf(x)), x });
     }
 
     {
-        const array :[2]u8 = .{'g', 'a'};
-        std.log.info("type of array: {s}, value of array: {s}",
-        .{@typeName(@TypeOf(array)), array});
+        const array: [2]u8 = .{ 'g', 'a' };
+        std.log.info("type of array: {s}, value of array: {s}", .{ @typeName(@TypeOf(array)), array });
     }
 
-    const i32_value: i32 = 3;   
+    const i32_value: i32 = 3;
     std.log.info("type of i32_value: {s}", .{@typeName(@TypeOf(i32_value))});
     std.log.info("type of i32: {s}", .{@typeName(@TypeOf(i32))});
     std.log.info("type of type: {s}", .{@typeName(@TypeOf(type))});
 
-
     const constant: i32 = 5; //signed 32-bit constant
     var variable: u32 = 500; //unsigned 32-bit constant
-    std.log.info("constant: {}, variable: {}", .{constant, variable});
+    std.log.info("constant: {}, variable: {}", .{ constant, variable });
 
     // @as performs explicit type coerion
     const inferred_constant = @as(i32, 5);
     var inferred_variable = @as(u32, 5000);
-    std.log.info("inferred_constant: {}, inferred_variable: {}", .{inferred_constant, inferred_variable});
+    std.log.info("inferred_constant: {}, inferred_variable: {}", .{ inferred_constant, inferred_variable });
 
     // random values for undefined
     const a: i32 = undefined;
     var b: u32 = undefined;
-    std.log.info("a: {}, b: {}", .{a, b});
+    std.log.info("a: {}, b: {}", .{ a, b });
 
-    const array_a = [5]u8{'h', 'e', 'l', 'l', 'o'};
-    const array_b = [_]u8{'h', 'e', 'l', 'l', 'o'}; // inferred len
-    std.log.info("array_a: {s}, array_b: {s}", .{array_a, array_b});
+    const array_a = [5]u8{ 'h', 'e', 'l', 'l', 'o' };
+    const array_b = [_]u8{ 'h', 'e', 'l', 'l', 'o' }; // inferred len
+    std.log.info("array_a: {s}, array_b: {s}", .{ array_a, array_b });
     const length = array_a.len;
     std.log.info("array.len: {}", .{length});
 
@@ -312,12 +296,12 @@ pub fn main() void {
     _ = 10;
 
     // weird for loops for numbers but works
-    for ([_]u0{0}**10) |_, i| {
+    for ([_]u0{0} ** 10) |_, i| {
         std.log.info("i in loop: {}", .{i});
     }
 
     std.log.info("before deferring in for loop", .{});
-    for ([_]u0{0}**10) |_, i| {
+    for ([_]u0{0} ** 10) |_, i| {
         defer std.log.info("deferring in loop, i: {}", .{i});
     }
     std.log.info("after deferring in for loop", .{});
@@ -336,8 +320,8 @@ pub fn main() void {
     std.log.info("helloError type: {s}", .{helloErrorType});
 
     // Error sets can be merged
-    const a_error_type = error{NotDir, PathNotFound};
-    const b_error_type = error{OutOfMemory, PathNotFound};
+    const a_error_type = error{ NotDir, PathNotFound };
+    const b_error_type = error{ OutOfMemory, PathNotFound };
     const c_error_type = a_error_type || b_error_type;
     std.log.info("c_error_type: {s}", .{c_error_type});
 
@@ -377,8 +361,8 @@ test "while with continue expression" {
 }
 
 test "for" {
-    const string =  [_]u8{'a', 'b', 'c'};
-    
+    const string = [_]u8{ 'a', 'b', 'c' };
+
     for (string) |character, index| {
         _ = character;
         _ = index;
@@ -421,7 +405,7 @@ test "defer" {
         defer x += 2;
         try expect(x == 5);
     }
-    try expect (x == 7);
+    try expect(x == 7);
 }
 
 test "multi defer" {
@@ -436,7 +420,7 @@ test "multi defer" {
 }
 
 fn returnWithDefer() i32 {
-    var result :i32 = 5;
+    var result: i32 = 5;
     defer result += 2;
     return result;
 }
@@ -457,14 +441,13 @@ test "block defer" {
     try expect(x == 4);
 }
 
-
 // Creating curost error set
 const CustomError = error{
     SomeError,
     OutOfMemory,
     AotherError,
 };
-const AllocationError = error {OutOfMemory};
+const AllocationError = error{OutOfMemory};
 
 test "coerce error from a subset to a superset" {
     const err: CustomError = AllocationError.OutOfMemory;
@@ -485,7 +468,7 @@ test "error union" {
     try expect(no_error == 10);
 }
 
-fn failingFunction() error{Oops}! void {
+fn failingFunction() error{Oops}!void {
     return error.Oops;
 }
 
@@ -628,7 +611,6 @@ test "usize" {
     try expect(@sizeOf(isize) == @sizeOf(*u8));
 }
 
-
 fn total(values: []const u8) usize {
     var sum: usize = 0;
     for (values) |v| sum += v;
@@ -636,20 +618,20 @@ fn total(values: []const u8) usize {
 }
 
 test "slices" {
-    const array = [_]u8{1, 2, 3, 4, 5};
-    const slice = array [0..3];
+    const array = [_]u8{ 1, 2, 3, 4, 5 };
+    const slice = array[0..3];
     try expect(total(slice) == 6);
 }
 
 test "slices 2" {
-    const array = [_]u8{1, 2, 3, 4, 5};
-    const slice = array [0..3];
+    const array = [_]u8{ 1, 2, 3, 4, 5 };
+    const slice = array[0..3];
     try expect(total(slice) == 6);
 }
 
 test "slices 3" {
-    const array = [_]u8{1, 2, 3, 4, 5};
-    const slice = array [0..];
+    const array = [_]u8{ 1, 2, 3, 4, 5 };
+    const slice = array[0..];
     _ = slice;
 }
 
@@ -711,7 +693,7 @@ const Mode = enum {
 
 test "hmm" {
     Mode.count += 1;
-    try expect(Mode.count == 1);  
+    try expect(Mode.count == 1);
 }
 
 const Vec3 = struct {
@@ -721,7 +703,7 @@ const Vec3 = struct {
 };
 
 test "struct usage" {
-    const my_vector = Vec3 {
+    const my_vector = Vec3{
         .x = 0,
         .y = 100,
         .z = 50,
@@ -731,7 +713,7 @@ test "struct usage" {
 
 test "missing struct field" {
     // missng z field will not compile
-    
+
     // const my_vector = Vec3 {
     //     .x = 0,
     //     .y = 100,
@@ -747,7 +729,7 @@ const Vec4 = struct {
 };
 
 test "struct defaults" {
-    const my_vector = Vec4 {
+    const my_vector = Vec4{
         .x = 25,
         .y = -50,
     };
@@ -765,7 +747,7 @@ const Stuff = struct {
 };
 
 test "automatic deference" {
-    var thing = Stuff {
+    var thing = Stuff{
         .x = 10,
         .y = 20,
     };
@@ -775,7 +757,7 @@ test "automatic deference" {
 }
 
 test "automatic deference 2" {
-    var thing = &Stuff {
+    var thing = &Stuff{
         .x = 10,
         .y = 20,
     };
@@ -791,7 +773,7 @@ test "automatic deference" {
     //     .y = 20,
     // };
 
-    var thing = Stuff {
+    var thing = Stuff{
         .x = 10,
         .y = 20,
     };
@@ -831,14 +813,14 @@ const Data = union(DataType) {
 test "switch on tagged union" {
     var result: u8 = 1;
 
-    var value = Data {.number = 5};
+    var value = Data{ .number = 5 };
     switch (value) {
         // case when there the union type is number
         // numberData is having the type: *u8
         .number => |*numberData| result += numberData.*,
 
         // must be exhaustive,
-        .boolean => |_|{},
+        .boolean => |_| {},
     }
 
     try expect(result == 6);
@@ -890,8 +872,14 @@ test "labelled blocks" {
 
 test "nested continue" {
     var count: usize = 0;
-    outer: for ([_]i32{1, 2, 3, 4, 5, 6, 7, 8}) |_| {
-        for ([_]i32{1, 2, 3, 4, 5,}) |_| {
+    outer: for ([_]i32{ 1, 2, 3, 4, 5, 6, 7, 8 }) |_| {
+        for ([_]i32{
+            1,
+            2,
+            3,
+            4,
+            5,
+        }) |_| {
             count += 1;
             continue :outer;
         }
@@ -909,14 +897,14 @@ fn rangeHasNumber(begin: usize, end: usize, number: usize) bool {
 }
 
 test "while loop expression" {
-    try expect (rangeHasNumber(0, 10, 3));
+    try expect(rangeHasNumber(0, 10, 3));
 }
 
 test "optional" {
     // result can be null or usize type
     var found_index: ?usize = null;
 
-    const data = [_]i32{1, 2, 3, 4, 5, 6, 7, 8, 12};
+    const data = [_]i32{ 1, 2, 3, 4, 5, 6, 7, 8, 12 };
     for (data) |v, i| {
         if (v == 10) found_index = i;
     }
@@ -952,7 +940,7 @@ test "if optional payload capture" {
         const value = a.?;
         _ = value;
     }
-    
+
     // more natural to do something with b if b contains value instead of null
     var b: ?i32 = 5;
     if (b) |*value| {
@@ -973,7 +961,7 @@ test "while null capture" {
     while (eventuallyNullSequence()) |value| { // |value| denotes payload capturing
         sum += value; // value: 3, 2, 1
     }
-    try expect (sum == 6);
+    try expect(sum == 6);
 }
 
 test "comptime blocks" {
@@ -1031,8 +1019,7 @@ fn addSmallInts(comptime T: type, a: T, b: T) T {
             a + b
         else
             @compileError("ints too large"),
-        else
-            => @compileError("only ints accepted"),
+        else => @compileError("only ints accepted"),
     };
     // TODO: find out how typeInfo works, switch and get captured value
 }
@@ -1044,12 +1031,10 @@ test "typeinfo switch" {
 }
 
 fn GetBiggerInt(comptime T: type) type {
-    return @Type(.{
-        .Int = .{
-            .bits = @typeInfo(T).Int.bits + 1,
-            .signedness = @typeInfo(T).Int.signedness,
-        }
-    });
+    return @Type(.{ .Int = .{
+        .bits = @typeInfo(T).Int.bits + 1,
+        .signedness = @typeInfo(T).Int.signedness,
+    } });
 }
 
 test "@Type" {
@@ -1066,9 +1051,7 @@ fn Vec(
         const Self = @This();
 
         fn abs(self: Self) Self {
-            var tmp = Self {
-                .data = undefined
-            };
+            var tmp = Self{ .data = undefined };
             for (self.data) |elem, i| {
                 tmp.data[i] = if (elem < 0)
                     -elem
@@ -1079,21 +1062,19 @@ fn Vec(
         }
 
         fn init(data: [count]T) Self {
-            return Self {
+            return Self{
                 .data = data,
             };
         }
-
-
     };
 }
 
 const eql = @import("std").mem.eql;
 
 test "generic vector" {
-    const x = Vec(3, f32).init([_]f32{10, -10, 5});
+    const x = Vec(3, f32).init([_]f32{ 10, -10, 5 });
     const y = x.abs();
-    try expect(eql(f32, &y.data, &[_]f32{10, 10, 5}));
+    try expect(eql(f32, &y.data, &[_]f32{ 10, 10, 5 }));
 }
 
 fn plusOne(x: anytype) @TypeOf(x) {
@@ -1118,12 +1099,12 @@ test "comptime ++" {
 }
 
 test "comptime **" {
-    const pattern = [_]u8{1, 2};
+    const pattern = [_]u8{ 1, 2 };
     const memory = pattern ** 3;
     try expect(eql(
         u8,
         &memory,
-        &[_]u8{1, 2, 1, 2, 1, 2},
+        &[_]u8{ 1, 2, 1, 2, 1, 2 },
     ));
 }
 
@@ -1158,7 +1139,7 @@ test "while optional" {
             break;
         }
     }
-    
+
     try expect(i == null);
 }
 
@@ -1182,7 +1163,7 @@ test "while error union capture" {
 }
 
 test "for capture" {
-    const x = [_]i8{1, 5, 120, -5};
+    const x = [_]i8{ 1, 5, 120, -5 };
     for (x) |v| try expect(@TypeOf(v) == i8);
 }
 
@@ -1194,7 +1175,7 @@ const Info = union(enum) {
 };
 
 test "switch tagged union with capture" {
-    var b = Info {
+    var b = Info{
         .a = 10,
     };
 
@@ -1207,25 +1188,25 @@ test "switch tagged union with capture" {
         .a, .d => |num| blk: {
             try expect(@TypeOf(num) == u32);
             break :blk num * 2;
-        }
+        },
     };
 
     try expect(x == 20);
 }
 
 test "for with pointer capture" {
-    var data = [_]u8{1, 2, 3};
+    var data = [_]u8{ 1, 2, 3 };
     for (data) |*byte| byte.* += 1;
-    try expect (eql(u8, &data, &[_]u8{2, 3, 4}));
+    try expect(eql(u8, &data, &[_]u8{ 2, 3, 4 }));
 }
 
 test "inline for" {
-    const types = [_]type{i32, f32, u8, bool};
+    const types = [_]type{ i32, f32, u8, bool };
     var sum: usize = 0;
 
     // inline loops are unrolled, only work at comptime
     // only use this for perf if properly tested
-    inline for (types) |T| sum +=  @sizeOf(T);
+    inline for (types) |T| sum += @sizeOf(T);
     try expect(sum == 10);
 }
 
@@ -1254,9 +1235,9 @@ test "opaque with declarations" {
 }
 
 test "anonymouse struct literal" {
-    const Point = struct {x: i32, y: i32};
+    const Point = struct { x: i32, y: i32 };
     // anon declaration
-    var pt: Point =  .{
+    var pt: Point = .{
         .x = 13,
         .y = 67,
     };
@@ -1264,7 +1245,7 @@ test "anonymouse struct literal" {
     try expect(pt.y == 67);
 
     // non anon declaration
-    var pt2 = Point {
+    var pt2 = Point{
         .x = 13,
         .y = 67,
     };
@@ -1282,11 +1263,11 @@ test "fully anonymous struct" {
 }
 
 fn dump(args: anytype) !void {
-    try(expect(args.int == 1234));
-    try(expect(args.float == 12.34));
-    try(expect(args.b));
-    try(expect(args.s[0] == 'h'));
-    try(expect(args.s[1] == 'i'));
+    try (expect(args.int == 1234));
+    try (expect(args.float == 12.34));
+    try (expect(args.b));
+    try (expect(args.s[0] == 'h'));
+    try (expect(args.s[1] == 'i'));
 }
 
 test "tuple" {
@@ -1308,7 +1289,7 @@ test "tuple" {
 }
 
 test "sentinel termination" {
-    const terminated = [3:0]u8{3, 2, 1};
+    const terminated = [3:0]u8{ 3, 2, 1 };
     try expect(terminated.len == 3);
     try expect(@bitCast([4]u8, terminated)[3] == 0);
 }
@@ -1318,7 +1299,7 @@ test "string literal" {
 }
 
 test "C string" {
-    try expect(@TypeOf("hello") == *const[5:0]u8);
+    try expect(@TypeOf("hello") == *const [5:0]u8);
 }
 
 test "sentinel termination coersion" {
@@ -1334,4 +1315,3 @@ test "sentinel termination coersion" {
     const f = e;
     _ = f;
 }
-

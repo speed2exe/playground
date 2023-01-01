@@ -2,7 +2,7 @@ const std = @import("std");
 const atomic = std.atomic;
 const testing = std.testing;
 
-pub fn FixedQueue (
+pub fn FixedQueue(
     comptime T: type,
     comptime capacity: usize,
 ) type {
@@ -11,7 +11,7 @@ pub fn FixedQueue (
 
         // circular buffer to store all the elements
         // extra space to denote end of circular queue
-        items: [capacity+1]Node(T) = undefined,
+        items: [capacity + 1]Node(T) = undefined,
 
         head_index: usize = 0,
 
@@ -56,7 +56,6 @@ pub fn FixedQueue (
             self.length -= 1;
             return head_node.value;
         }
-
     };
 }
 
@@ -74,8 +73,7 @@ fn Node(comptime T: type) type {
         right_index: ?usize = null,
 
         fn debugPrint(self: Self) void {
-            std.log.warn("Node: value: {}, self_index: {}, left_index: {}, right_index: {}", 
-            .{self.value, self.self_index, self.left_index, self.right_index});
+            std.log.warn("Node: value: {}, self_index: {}, left_index: {}, right_index: {}", .{ self.value, self.self_index, self.left_index, self.right_index });
         }
     };
 }
@@ -105,17 +103,17 @@ test "FixedQueue" {
 //     {
 //         try testing.expect(null != queue.push(10));
 //         try testing.expectEqual(@as(?u32, 10), queue.pop() orelse unreachable);
-// 
+//
 //         try testing.expect(null != queue.push(11)); // 11
 //         try testing.expect(null != queue.push(12)); // 11, 12
 //         try testing.expectEqual(@as(?u32, 11), queue.pop() orelse unreachable); // 12
-// 
+//
 //         try testing.expect(null != queue.push(13)); // 12, 13
 //         try testing.expect(null != queue.push(14)); // 12, 13, 14
 //         try testing.expect(null != queue.push(15)); // 12, 13, 14, 15
 //         try testing.expectEqual(@as(?u32, 12), queue.pop() orelse unreachable); // 15, 13, 14
 //         try testing.expectEqual(@as(?u32, 13), queue.pop() orelse unreachable); // 15, 13, 14
-// 
+//
 //         try testing.expect(null != queue.push(16)); // 12, 13, 14, 15
 //         try testing.expectEqual(@as(?u32, 14), queue.pop() orelse unreachable);
 //         try testing.expectEqual(@as(?u32, 15), queue.pop() orelse unreachable);
