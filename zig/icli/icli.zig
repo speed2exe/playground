@@ -71,7 +71,7 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         /// post_cursor_position: 4
         pre_cursor_buffer: array_list.Array(u8),
         post_cursor_buffer: []u8,
-        post_cursor_position: usize,
+        post_cursor_position: usize = 0,
 
         /// suggestion handling
         max_suggestion_count: usize = setting.max_suggestion_count,
@@ -111,7 +111,6 @@ pub fn InteractiveCli(comptime setting: Settings) type {
                 .pre_cursor_buffer = pre_cursor_buffer,
                 .backup_buffer = backup_buffer,
                 .post_cursor_buffer = post_cursor_buffer,
-                .post_cursor_position = 0,
                 .log_file = log_file,
             };
         }
