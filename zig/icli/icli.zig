@@ -22,15 +22,15 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), comptime_settings.history_size);
 
         // Keybindings set up at comptime
-        // TODO: allow user to include their own custom keybind
+        // TODO: allow user to include their own custom keybind(with a context)
         const keybind_by_keypress = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, .{
-           .{ &[_]u8{3}, Self.cancel }, // ctrl-c
-           .{ &[_]u8{4}, Self.quit }, // ctrl-d
-           .{ &[_]u8{127}, Self.backspace }, // backspace
-           .{ "\x1b[A", Self.selectLessRecent }, // up
-           .{ "\x1b[B", Self.selectMoreRecent }, // down
-           .{ "\x1b[C", Self.moveCursorRight }, // right
-           .{ "\x1b[D", Self.moveCursorLeft }, // left
+            .{ &[_]u8{3}, Self.cancel }, // ctrl-c
+            .{ &[_]u8{4}, Self.quit }, // ctrl-d
+            .{ &[_]u8{127}, Self.backspace }, // backspace
+            .{ "\x1b[A", Self.selectLessRecent }, // up
+            .{ "\x1b[B", Self.selectMoreRecent }, // down
+            .{ "\x1b[C", Self.moveCursorRight }, // right
+            .{ "\x1b[D", Self.moveCursorLeft }, // left
         });
 
         // variables that are pretty much unchanged once initialized
