@@ -273,11 +273,11 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         fn backspace(self: *Self) !void {
             _ = self.pre_cursor_buffer.pop() orelse return;
             try self.printf("\x1b[D", .{}); // move cursor left
+            try self.printf("\x1b[K", .{}); // clear from cursor to end of line
 
             // handle post cursor buffer
             const post_cursor_input = self.validPostCursorBuffer();
             if (post_cursor_input.len > 0) {
-                try self.printf("\x1b[K", .{}); // clear from cursor to end of line
                 try self.printf("{s}", .{self.validPostCursorBuffer()}); // print post cursor buffer
                 try self.printf("\x1b[{d}D", .{self.validPostCursorBuffer().len}); // move cursor left proportionally to len of post cursor buffer
             }
