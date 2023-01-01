@@ -249,8 +249,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             try self.printf("\x1b[{d}D", .{to_move_left});
         }
 
-        // TODO: hash table
-        // return true if handled, input will not be added to the input_buffer
+        // return true if handled
         fn handleKeyBind(self: *Self, bytes: []const u8) !bool {
             const action = keybind_by_keypress.get(bytes) orelse return false;
             try action(self);
@@ -263,8 +262,11 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         /// keybind
-        fn cancel(_: *Self) !void {
-            return error.Cancel;
+        fn cancel(self: *Self) !void {
+            try self.printf("\n", .{});
+            self.invalidatePreCursorBuffer();
+            self.invalidatePostCursorBuffer();
+            try self.reDraw();
         }
 
         /// keybind
@@ -337,7 +339,6 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         /// reDraws the prompt for user to see
-        /// TODO: redo for minor changes
         fn reDraw(self: *Self) !void {
             // move cursor to the beginning of the line & clear the line
             try self.printf("\r\x1b[K", .{});
@@ -369,6 +370,10 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         inline fn validPostCursorBuffer(self: *Self) []const u8 {
             return self.post_cursor_buffer[self.post_cursor_position..];
+        }
+
+        inline fn invalidatePreCursorBuffer(self: *Self) void {
+            self.pre_cursor_buffer.truncate(0);
         }
 
         inline fn invalidatePostCursorBuffer(self: *Self) void {
