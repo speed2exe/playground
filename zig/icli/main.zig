@@ -17,16 +17,13 @@ pub fn main() void {
 }
 
 fn runApp(allocator: std.mem.Allocator) !void {
-    const comptime_settings = comptime icli.ComptimeSettings{
-        .log_file_path = "app.log",
-    };
     const settings = icli.Settings{
-        .allocator = allocator,
+        .log_file_path = "app.log",
         .execute = execute,
     };
 
-    const cli_type = comptime icli.InteractiveCli(comptime_settings);
-    var cli = try cli_type.init(settings);
+    const cli_type = comptime icli.InteractiveCli(settings);
+    var cli = try cli_type.init(allocator);
     defer cli.deinit();
 
     try cli.run();

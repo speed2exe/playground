@@ -14,12 +14,12 @@ const termios = switch (builtin.os.tag) {
     else => @import("./termios_c.zig"),
 };
 
-pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
+pub fn InteractiveCli(comptime setting: Settings) type {
     return struct {
         const Self = @This();
-        const RingBufferedReader = ring_buffered_reader.RingBufferedReader(std.fs.File.Reader, comptime_settings.input_buffer_size);
-        const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, comptime_settings.input_buffer_size);
-        const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), comptime_settings.history_size);
+        const RingBufferedReader = ring_buffered_reader.RingBufferedReader(std.fs.File.Reader, setting.input_buffer_size);
+        const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, setting.input_buffer_size);
+        const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), setting.history_size);
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
@@ -33,13 +33,18 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             .{ "\x1b[D", Self.moveCursorLeft }, // left
         });
 
+        // Prompt (the thing before user input, e.g. "> ")
+        prompt: []const u8 = setting.prompt, // TODO: use enum to allow for different prompts (e.g. dynamic prompt)
+
+        // Execution
+        execute: *const fn ([]const u8) bool = setting.execute, // TODO: reconsider signature
+
         // variables that are pretty much unchanged once initialized
         original_termios: std.os.termios,
         raw_mode_termios: std.os.termios,
         allocator: std.mem.Allocator,
-        settings: Settings,
         tty: File,
-        isEndOfUserInput: *const fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = comptime_settings.isEndOfUserInput,
+        isEndOfUserInput: *const fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = setting.isEndOfUserInput,
 
         /// io buffered readers/writers
         input: RingBufferedReader,
@@ -47,8 +52,9 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         /// history handling
         /// (when user presses up or down to select previously executed commands)
-        history: History,
-        history_selected: ?*History.Node, // current history node that user is using
+        history: History = History{},
+        history_size: usize = setting.history_size,
+        history_selected: ?*History.Node = null, // current history node that user is using
         backup_buffer: array_list.Array(u8),
 
         /// pre and post cursor buffer handling
@@ -67,10 +73,13 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         post_cursor_buffer: []u8,
         post_cursor_position: usize,
 
+        /// suggestion handling
+        max_suggestion_count: usize = setting.max_suggestion_count,
+
         /// file that collects all logs
         log_file: ?File,
 
-        pub fn init(settings: Settings) !Self {
+        pub fn init(allocator: std.mem.Allocator) !Self {
             var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = OpenMode.read_write });
             if (!tty.isTty()) {
                 return error.DeviceNotTty;
@@ -81,13 +90,13 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const original_termios = try std.os.tcgetattr(tty.handle);
             const raw_mode_termios = termios.getRawModeTermios(original_termios);
 
-            var pre_cursor_buffer = array_list.Array(u8).init(settings.allocator);
-            var backup_buffer = array_list.Array(u8).init(settings.allocator);
+            var pre_cursor_buffer = array_list.Array(u8).init(allocator);
+            var backup_buffer = array_list.Array(u8).init(allocator);
             var post_cursor_buffer = &[_]u8{};
 
             // const log_file = null;
             const log_file = blk: {
-                const log_path = comptime_settings.log_file_path orelse break :blk null;
+                const log_path = setting.log_file_path orelse break :blk null;
                 const log_file = try std.fs.cwd().createFile(log_path, .{});
                 break :blk log_file;
             };
@@ -96,12 +105,9 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 .tty = tty,
                 .input = input,
                 .output = output,
-                .history = History{},
                 .original_termios = original_termios,
                 .raw_mode_termios = raw_mode_termios,
-                .allocator = settings.allocator,
-                .settings = settings,
-                .history_selected = null,
+                .allocator = allocator,
                 .pre_cursor_buffer = pre_cursor_buffer,
                 .backup_buffer = backup_buffer,
                 .post_cursor_buffer = post_cursor_buffer,
@@ -114,7 +120,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             self.pre_cursor_buffer.deinit();
             self.backup_buffer.deinit();
 
-            self.settings.allocator.free(self.post_cursor_buffer);
+            self.allocator.free(self.post_cursor_buffer);
 
             const n = self.history.length;
             const valid_nodes = self.history.nodes[0..n];
@@ -127,7 +133,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             while (true) {
                 try self.printPrompt();
                 try self.readUserInput();
-                if (self.settings.execute(self.pre_cursor_buffer.getAll())) {
+                if (self.execute(self.pre_cursor_buffer.getAll())) {
                     return;
                 }
                 self.postExecution();
@@ -136,7 +142,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         fn postExecution(self: *Self) void {
             // Update the history
-            if (comptime_settings.history_size == 0) {
+            if (self.history_size == 0) {
                 return;
             }
 
@@ -152,9 +158,9 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
                 }
             }
 
-            if (self.history.length < comptime_settings.history_size) {
+            if (self.history.length < self.history_size) {
                 _ = self.history.insertHead(self.pre_cursor_buffer);
-                self.pre_cursor_buffer = array_list.Array(u8).init(self.settings.allocator);
+                self.pre_cursor_buffer = array_list.Array(u8).init(self.allocator);
                 return;
             }
 
@@ -169,7 +175,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         inline fn printPrompt(self: *Self) !void {
             // TODO: might add dynamic prompt later
-            try self.printf("{s}", .{self.settings.prompt});
+            try self.printf("{s}", .{self.prompt});
         }
 
         /// Read user input and store it in self.input_buffer
@@ -210,6 +216,14 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
                 // TODO: generate autocompletion after flush?
             }
+        }
+
+        fn printSuggestion(self: Self) !void {
+            _ = self;
+            // comptime_settings.max_suggestion_count;
+
+            //
+
         }
 
         fn prependPostCursorBuffer(self: *Self, bytes: []const u8) !void {
@@ -407,19 +421,17 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
     };
 }
 
-pub const ComptimeSettings = struct {
+pub const Settings = struct {
     input_buffer_size: usize = 4096,
     history_size: usize = 100,
     log_file_path: ?[]const u8 = null,
     isEndOfUserInput: fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = defaults.isEndOfUserInput,
-};
 
-pub const Settings = struct {
-    welcome_message: []const u8 = "Welcome!",
-    allocator: std.mem.Allocator,
     execute: *const fn ([]const u8) bool,
-    // suggest: ?*fn ([]const u8, usize) [][]const u8 = null,
     prompt: []const u8 = "> ",
+
+    max_suggestion_count: usize = 5,
+    suggest_function: ?*const fn ([]const u8, usize) [][]const u8 = null,
 };
 
 fn isEnd(byte: u8) bool {
