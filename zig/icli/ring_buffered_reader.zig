@@ -19,7 +19,7 @@ pub fn RingBufferedReader(
         buffer: RingBuffer = .{},
 
         pub fn init(r: ReaderType) Self {
-            return Self { .src = r };
+            return Self{ .src = r };
         }
 
         pub fn read(self: *Self, dest: []u8) Error!usize {
@@ -30,10 +30,10 @@ pub fn RingBufferedReader(
         }
 
         pub fn reader(self: *Self) Reader {
-            return Reader { .context = self };
+            return Reader{ .context = self };
         }
 
-        pub fn readConst(self: *Self) ![]const u8{
+        pub fn readConst(self: *Self) ![]const u8 {
             if (!(try self.ensureDataInBuffer())) {
                 return &[0]u8{};
             }
@@ -47,7 +47,6 @@ pub fn RingBufferedReader(
             }
             return true;
         }
-
     };
 }
 

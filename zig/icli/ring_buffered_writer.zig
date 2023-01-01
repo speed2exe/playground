@@ -16,11 +16,11 @@ pub fn RingBufferedWriter(
         buffer: RingBuffer = .{},
 
         pub fn init(w: WriterType) Self {
-            return Self { .dest = w };
+            return Self{ .dest = w };
         }
 
         pub fn writer(self: *Self) Writer {
-            return Writer { .context = self };
+            return Writer{ .context = self };
         }
 
         // blocks until all bytes are written

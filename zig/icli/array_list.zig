@@ -13,7 +13,7 @@ pub fn Array(comptime T: type) type {
         len: usize,
 
         pub fn init(allocator: std.mem.Allocator) Self {
-            return Self {
+            return Self{
                 .elems = &[_]T{},
                 .len = 0,
                 .allocator = allocator,
@@ -102,7 +102,6 @@ pub fn Array(comptime T: type) type {
             self.allocator.free(self.elems);
             self.elems = new_elems;
         }
-
     };
 }
 
@@ -127,32 +126,32 @@ test "Array" {
     try array.append(7);
     try array.append(8);
     try testing.expect(array.capacity() >= 3);
-    try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{6, 7, 8});
+    try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{ 6, 7, 8 });
 
     {
         const should_be_eight = array.pop() orelse unreachable;
         try testing.expect(should_be_eight == 8);
 
-        const last = array.lastElem() orelse unreachable ;
+        const last = array.lastElem() orelse unreachable;
         try testing.expect(last == 7);
     }
 
     try array.append(9);
-    try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{6, 7, 9});
+    try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{ 6, 7, 9 });
 
     try array.setAtIndex(1, 11);
-    try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{6, 11, 9});
+    try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{ 6, 11, 9 });
 
     try array.removeAtIndex(1);
-    try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{6, 9});
+    try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{ 6, 9 });
     try array.removeAtIndex(1);
     try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{6});
 
     {
         // append slice
-        var slice = [_]i8{1, 2, 3, 5, 6, 7, 8, 9, 10};
+        var slice = [_]i8{ 1, 2, 3, 5, 6, 7, 8, 9, 10 };
         try array.appendSlice(&slice);
-        try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{6, 1, 2, 3, 5, 6, 7, 8, 9, 10});
+        try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{ 6, 1, 2, 3, 5, 6, 7, 8, 9, 10 });
     }
 }
 
@@ -173,13 +172,13 @@ fn nextPowerOf2IfNotPowerOf2(n: usize) usize {
 }
 
 test "nextPowerOfTwo" {
-    try testing.expectEqual(@as(usize,1), nextPowerOf2IfNotPowerOf2(1));
-    try testing.expectEqual(@as(usize,2), nextPowerOf2IfNotPowerOf2(2));
-    try testing.expectEqual(@as(usize,4), nextPowerOf2IfNotPowerOf2(3));
-    try testing.expectEqual(@as(usize,4), nextPowerOf2IfNotPowerOf2(4));
-    try testing.expectEqual(@as(usize,8), nextPowerOf2IfNotPowerOf2(5));
-    try testing.expectEqual(@as(usize,8), nextPowerOf2IfNotPowerOf2(6));
-    try testing.expectEqual(@as(usize,8), nextPowerOf2IfNotPowerOf2(7));
-    try testing.expectEqual(@as(usize,8), nextPowerOf2IfNotPowerOf2(8));
-    try testing.expectEqual(@as(usize,16), nextPowerOf2IfNotPowerOf2(9));
+    try testing.expectEqual(@as(usize, 1), nextPowerOf2IfNotPowerOf2(1));
+    try testing.expectEqual(@as(usize, 2), nextPowerOf2IfNotPowerOf2(2));
+    try testing.expectEqual(@as(usize, 4), nextPowerOf2IfNotPowerOf2(3));
+    try testing.expectEqual(@as(usize, 4), nextPowerOf2IfNotPowerOf2(4));
+    try testing.expectEqual(@as(usize, 8), nextPowerOf2IfNotPowerOf2(5));
+    try testing.expectEqual(@as(usize, 8), nextPowerOf2IfNotPowerOf2(6));
+    try testing.expectEqual(@as(usize, 8), nextPowerOf2IfNotPowerOf2(7));
+    try testing.expectEqual(@as(usize, 8), nextPowerOf2IfNotPowerOf2(8));
+    try testing.expectEqual(@as(usize, 16), nextPowerOf2IfNotPowerOf2(9));
 }

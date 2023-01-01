@@ -7,21 +7,20 @@ pub fn main() void {
     defer {
         const leaked = gpa.deinit();
         if (leaked) {
-            std.log.err("got leaked!",.{});
+            std.log.err("got leaked!", .{});
         }
     }
 
     runApp(allocator) catch |err| {
         std.debug.print("app stopped: {}", .{err});
     };
-
 }
 
 fn runApp(allocator: std.mem.Allocator) !void {
-    const comptime_settings = comptime icli.ComptimeSettings {
+    const comptime_settings = comptime icli.ComptimeSettings{
         .log_file_path = "app.log",
     };
-    const settings = icli.Settings {
+    const settings = icli.Settings{
         .allocator = allocator,
         .execute = execute,
     };
@@ -31,7 +30,6 @@ fn runApp(allocator: std.mem.Allocator) !void {
     defer cli.deinit();
 
     try cli.run();
-
 
     // need to pass in option
 
@@ -47,7 +45,7 @@ fn execute(cmd: []const u8) bool {
 
 // TODO:
 // fn suggest(cmd: []const u8, cursor_position: usize) [][]const u8 {
-// 
+//
 // }
 
-// 
+//

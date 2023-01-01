@@ -2,10 +2,8 @@ const std = @import("std");
 const tree_print = @import("tree_print.zig");
 
 pub fn main() !void {
-
-
     const l = .{
-        .{"r", @as(u8, 1)},
+        .{ "r", @as(u8, 1) },
     };
 
     const m_t = std.ComptimeStringMap(u8, comptime l);

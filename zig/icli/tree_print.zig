@@ -31,14 +31,14 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
             const backup_len = prefix.items.len;
             {
                 inline for (s.fields[0..last_field_idx]) |field| {
-                    try writer.print("\n{s}├─", .{ prefix.items });
+                    try writer.print("\n{s}├─", .{prefix.items});
                     try prefix.appendSlice("│ ");
-                    try treePrintPrefix(prefix, writer, @field(arg, field.name), "."++field.name);
+                    try treePrintPrefix(prefix, writer, @field(arg, field.name), "." ++ field.name);
                     prefix.shrinkRetainingCapacity(backup_len);
                 }
             }
             {
-                try writer.print("\n{s}└─", .{ prefix.items });
+                try writer.print("\n{s}└─", .{prefix.items});
                 const last_field_name = s.fields[last_field_idx].name;
                 try prefix.appendSlice("  ");
                 try treePrintPrefix(prefix, writer, @field(arg, last_field_name), "." ++ last_field_name);
@@ -91,7 +91,7 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
                         }
                     }
                     {
-                        try writer.print("\n{s}└─", .{ prefix.items });
+                        try writer.print("\n{s}└─", .{prefix.items});
                         const backup_len = prefix.items.len;
                         try prefix.appendSlice("  ");
                         try treePrintPrefix(prefix, writer, arg.*, ".*");

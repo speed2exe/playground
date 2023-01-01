@@ -10,7 +10,5 @@ pub fn isEndOfUserInput(keypress: []const u8, input_pre_cursor: []const u8, inpu
 }
 
 pub fn keymap() void {
-    std.AutoHashMap([]const u8, fn()void);
+    std.AutoHashMap([]const u8, fn () void);
 }
-
-

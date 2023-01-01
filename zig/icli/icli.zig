@@ -23,7 +23,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
-        const keybind_by_keypress = std.ComptimeStringMap(*const fn(self: *Self) anyerror!void, .{
+        const keybind_by_keypress = std.ComptimeStringMap(*const fn (self: *Self) anyerror!void, .{
             .{ &[_]u8{3}, Self.cancel }, // ctrl-c
             .{ &[_]u8{4}, Self.quit }, // ctrl-d
             .{ &[_]u8{127}, Self.backspace }, // backspace
@@ -39,7 +39,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         allocator: std.mem.Allocator,
         settings: Settings,
         tty: File,
-        isEndOfUserInput: *const fn(keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = comptime_settings.isEndOfUserInput,
+        isEndOfUserInput: *const fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = comptime_settings.isEndOfUserInput,
 
         /// io buffered readers/writers
         input: RingBufferedReader,
@@ -174,7 +174,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
 
         /// Read user input and store it in self.input_buffer
         fn readUserInput(self: *Self) !void {
-            try self.log_to_file("readUserInput: waiting...\n",.{});
+            try self.log_to_file("readUserInput: waiting...\n", .{});
             try self.setRawInputMode();
             defer self.setOriginalInputMode() catch |err| {
                 self.log_to_file("Failed to set original input mode: {any}", .{err}) catch unreachable;
@@ -278,8 +278,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
             const post_cursor_input = self.validPostCursorBuffer();
             if (post_cursor_input.len > 0) {
                 try self.printf("\x1b[K", .{}); // clear from cursor to end of line
-                try self.printf("{s}", .{ self.validPostCursorBuffer() }); // print post cursor buffer
-                try self.printf("\x1b[{d}D", .{ self.validPostCursorBuffer().len }); // move cursor left proportionally to len of post cursor buffer
+                try self.printf("{s}", .{self.validPostCursorBuffer()}); // print post cursor buffer
+                try self.printf("\x1b[{d}D", .{self.validPostCursorBuffer().len}); // move cursor left proportionally to len of post cursor buffer
             }
         }
 
@@ -354,8 +354,8 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         }
 
         inline fn printCurrentInput(self: *Self) !void {
-            try self.printf("{s}", .{ self.validPreCursorBuffer() });
-            try self.printf("{s}", .{ self.validPostCursorBuffer() });
+            try self.printf("{s}", .{self.validPreCursorBuffer()});
+            try self.printf("{s}", .{self.validPostCursorBuffer()});
         }
 
         inline fn setRawInputMode(self: *Self) !void {
@@ -396,7 +396,7 @@ pub fn InteractiveCli(comptime comptime_settings: ComptimeSettings) type {
         inline fn log_var_to_file(self: *Self, v: anytype, comptime name: []const u8) !void {
             if (self.log_file) |f| {
                 try tree_print.treePrint(self.allocator, f.writer(), v, name);
-                try f.writer().print("\n",.{});
+                try f.writer().print("\n", .{});
             }
         }
 
@@ -411,7 +411,7 @@ pub const ComptimeSettings = struct {
     input_buffer_size: usize = 4096,
     history_size: usize = 100,
     log_file_path: ?[]const u8 = null,
-    isEndOfUserInput: fn(keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = defaults.isEndOfUserInput,
+    isEndOfUserInput: fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = defaults.isEndOfUserInput,
 };
 
 pub const Settings = struct {
