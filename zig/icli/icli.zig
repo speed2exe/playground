@@ -20,7 +20,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         const RingBufferedReader = ring_buffered_reader.RingBufferedReader(std.fs.File.Reader, settings.input_buffer_size);
         const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, settings.input_buffer_size);
         const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), settings.history_size);
-        const CursorMover = CursorMoverOf(RingBufferedWriter.Writer);
+        const CursorMover = CursorMoverOf(RingBufferedWriter);
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
@@ -85,21 +85,17 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         /// file that collects all logs
         log_file: ?File,
 
+        // if pre run set up is already done
+        done_pre_run_setup: bool = false,
+
+        // check for error and  failure
         pub fn init(allocator: std.mem.Allocator) !Self {
             var tty = try std.fs.openFileAbsolute("/dev/tty", .{ .mode = OpenMode.read_write });
             if (!tty.isTty()) {
                 return error.DeviceNotTty;
             }
-            var input = RingBufferedReader.init(tty.reader());
-            var output = RingBufferedWriter.init(tty.writer());
-            var cursor_mover = CursorMover.init(output.writer());
 
             const original_termios = try std.os.tcgetattr(tty.handle);
-            const raw_mode_termios = termios.getRawModeTermios(original_termios);
-
-            var pre_cursor_buffer = array_list.Array(u8).init(allocator);
-            var backup_buffer = array_list.Array(u8).init(allocator);
-            var post_cursor_buffer = &[_]u8{};
 
             // const log_file = null;
             const log_file = blk: {
@@ -110,15 +106,15 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
             return Self{
                 .tty = tty,
-                .input = input,
-                .output = output,
-                .cursor_mover = cursor_mover,
+                .input = undefined,
+                .output = undefined,
+                .cursor_mover = undefined,
                 .original_termios = original_termios,
-                .raw_mode_termios = raw_mode_termios,
+                .raw_mode_termios = undefined,
                 .allocator = allocator,
-                .pre_cursor_buffer = pre_cursor_buffer,
-                .backup_buffer = backup_buffer,
-                .post_cursor_buffer = post_cursor_buffer,
+                .pre_cursor_buffer = array_list.Array(u8).init(allocator),
+                .backup_buffer = array_list.Array(u8).init(allocator),
+                .post_cursor_buffer = &[_]u8{},
                 .log_file = log_file,
             };
         }
@@ -136,14 +132,17 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             }
         }
 
-        pub fn run(self: *Self) !void {
-            const T = CursorMoverOf2(RingBufferedWriter);
-            var c = T.init(&self.output);
-            try c.testPrint();
-            _ = try self.output.flush();
-            try self.log_var_to_file(c.writer.buffer.buffer[0..20], "c.writer");
-            try self.log_var_to_file(self.output.buffer.buffer[0..20], "self.output");
+        fn preRun(self: *Self) void {
+            if (self.done_pre_run_setup) return;
+            self.input = RingBufferedReader.init(self.tty.reader());
+            self.output = RingBufferedWriter.init(self.tty.writer());
+            self.cursor_mover = CursorMover.init(&self.output);
+            self.raw_mode_termios = termios.getRawModeTermios(self.original_termios);
+            self.done_pre_run_setup = true;
+        }
 
+        pub fn run(self: *Self) !void {
+            preRun(self);
 
             while (true) {
                 try self.readUserInput();
@@ -240,8 +239,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         }
 
         fn clearSuggestions(self: *Self) !void {
-            const bytes = ("\n\x1b[2K" ** (self.displayed_suggestions.len + 1))
-                ++ ("\x1b[A" ** (self.displayed_suggestions.len + 1));
+            const bytes = ("\n\x1b[2K" ** (self.displayed_suggestions.len + 1)) ++ ("\x1b[A" ** (self.displayed_suggestions.len + 1));
             try self.print("{s}", .{bytes});
         }
 
@@ -275,11 +273,11 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 try self.log_var_to_file(description.len, "description.len");
                 try self.log_var_to_file(pre_suggestion_left_offset, "pre_suggestion_left_offset");
 
-                try self.output.writer().print("\x1b[{d}D", .{description.len + max_text_len + 1});
+                // try self.output.writer().print("\x1b[{d}D", .{description.len + max_text_len + 1});
                 // try self.cursor_mover.moveLeft(description.len + max_text_len + 1);
 
                 // try self.cursor_mover.moveLeft(description.len + max_text_len);
-                // try self.cursor_mover.moveHorizontal(max_text_len + description.len + 1, pre_suggestion_left_offset);
+                try self.cursor_mover.moveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
             }
 
             try self.output.writer().print("\x1b[{d}A", .{self.current_suggestions.len});
@@ -517,19 +515,20 @@ fn isEnd(byte: u8) bool {
 }
 
 /// Writer is of type: std.io.Writer
-fn CursorMoverOf(comptime Writer: type) type {
-    return struct{
+fn CursorMoverOf(comptime WriterType: type) type {
+    return struct {
         const Self = @This();
+        pub const Writer = WriterType.Writer;
 
         writer: Writer,
 
-        pub fn init(w: Writer) Self {
+        pub fn init(w: *WriterType) Self {
             return .{
-                .writer = w,
+                .writer = .{ .context = w },
             };
         }
 
-        pub fn moveHorizontal(self: Self, left: usize, right: usize) !void {
+        pub fn moveHorizontal(self: *Self, left: usize, right: usize) !void {
             if (left > right) {
                 return self.moveLeft(left - right);
             }
@@ -547,30 +546,11 @@ fn CursorMoverOf(comptime Writer: type) type {
         }
 
         pub fn testPrint(self: *Self) !void {
-            _ = try self.writer.write("Hello World");
-        }
-    };
-}
-
-fn CursorMoverOf2(comptime Writer: type) type {
-    return struct{
-        const Self = @This();
-
-        writer: Writer,
-
-        pub fn init(w: *Writer) Self {
-            return .{
-                .writer = w.*,
-            };
-        }
-
-        pub fn testPrint(self: *Self) !void {
-            _ = try self.writer.writer().write("testPrint\n\n");
-            _ = try self.writer.flush();
+            try self.writer.print("testPrint\n", .{});
         }
     };
 }
 
 // TODO: inform user to Sort and Filter, but provide default implementation
-
-// TODO: inform user to Sort and Filter, but provide default implementation
+// TODO: ignore undefined keys, like F1, F2, Alt+??, Ctrl+??, etc.
+// TODO: clean up completion after quit (ctrl-D)
