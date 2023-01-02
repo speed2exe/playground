@@ -24,9 +24,9 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
         const keybind_by_keypress = std.ComptimeStringMap(*const fn (self: *Self) anyerror!void, .{
-            .{ &[_]u8{3}, Self.cancel }, // ctrl-c
-            .{ &[_]u8{4}, Self.quit }, // ctrl-d
-            .{ &[_]u8{127}, Self.backspace }, // backspace
+            .{ &[_]u8{3}, Self.handleCtrlC }, // ctrl-c
+            .{ &[_]u8{4}, Self.handleCtrlD }, // ctrl-d
+            .{ &[_]u8{127}, Self.handleBackspace }, // backspace
             .{ "\x1b[A", Self.selectLessRecent }, // up
             .{ "\x1b[B", Self.selectMoreRecent }, // down
             .{ "\x1b[C", Self.moveCursorRight }, // right
@@ -217,6 +217,7 @@ pub fn InteractiveCli(comptime setting: Settings) type {
             }
         }
 
+        //TODO:
         fn printSuggestion(self: Self) !void {
             _ = self;
             // comptime_settings.max_suggestion_count;
@@ -270,12 +271,12 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         }
 
         /// keybind
-        fn quit(_: *Self) !void {
+        fn handleCtrlD(_: *Self) !void {
             return error.Quit;
         }
 
         /// keybind
-        fn cancel(self: *Self) !void {
+        fn handleCtrlC(self: *Self) !void {
             try self.printf("\n", .{});
             self.invalidatePreCursorBuffer();
             self.invalidatePostCursorBuffer();
@@ -283,7 +284,7 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         }
 
         /// keybind
-        fn backspace(self: *Self) !void {
+        fn handleBackspace(self: *Self) !void {
             _ = self.pre_cursor_buffer.pop() orelse return;
             try self.printf("\x1b[D", .{}); // move cursor left
             try self.printf("\x1b[K", .{}); // clear from cursor to end of line
