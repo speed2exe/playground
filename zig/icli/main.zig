@@ -20,6 +20,7 @@ fn runApp(allocator: std.mem.Allocator) !void {
     const settings = icli.Settings{
         .log_file_path = "app.log",
         .execute = execute,
+        .suggest = suggest,
     };
 
     const cli_type = comptime icli.InteractiveCli(settings);
@@ -46,3 +47,14 @@ fn execute(cmd: []const u8) bool {
 // }
 
 //
+
+var s = [2]icli.Suggestion{
+    .{ .text = "foo", .description = "foo description" },
+    .{ .text = "bar", .description = "bar description" },
+};
+
+fn suggest(pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) []icli.Suggestion {
+    _ = pre_cursor_buffer;
+    _ = post_cursor_buffer;
+    return &s;
+}

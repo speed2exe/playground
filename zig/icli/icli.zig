@@ -75,6 +75,9 @@ pub fn InteractiveCli(comptime setting: Settings) type {
 
         /// suggestion handling
         max_suggestion_count: usize = setting.max_suggestion_count,
+        suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) []Suggestion = setting.suggest,
+        current_suggestions: []Suggestion = undefined,
+        displayed_suggestions: [setting.max_suggestion_count]Suggestion = undefined,
 
         /// file that collects all logs
         log_file: ?File,
@@ -130,7 +133,6 @@ pub fn InteractiveCli(comptime setting: Settings) type {
 
         pub fn run(self: *Self) !void {
             while (true) {
-                try self.printPrompt();
                 try self.readUserInput();
                 if (self.execute(self.pre_cursor_buffer.getAll())) {
                     return;
@@ -174,12 +176,16 @@ pub fn InteractiveCli(comptime setting: Settings) type {
 
         inline fn printPrompt(self: *Self) !void {
             // TODO: might add dynamic prompt later
-            try self.printf("{s}", .{self.prompt});
+            try self.print("{s}", .{self.prompt});
         }
 
         /// Read user input and store it in self.input_buffer
         fn readUserInput(self: *Self) !void {
+            try self.printPrompt();
+            try self.flush();
+
             try self.log_to_file("readUserInput: waiting...\n", .{});
+
             try self.setRawInputMode();
             defer self.setOriginalInputMode() catch |err| {
                 self.log_to_file("Failed to set original input mode: {any}", .{err}) catch unreachable;
@@ -190,6 +196,9 @@ pub fn InteractiveCli(comptime setting: Settings) type {
             self.history_selected = null;
 
             while (true) {
+                // TODO: consider async flushing
+                defer _ = self.output.flush() catch unreachable;
+
                 const input = try self.input.readConst();
                 try self.log_to_file("read: {s}, bytes: {d}\n", .{ input, input });
 
@@ -202,7 +211,6 @@ pub fn InteractiveCli(comptime setting: Settings) type {
                 if (self.isEndOfUserInput(input, self.pre_cursor_buffer.getAll(), self.validPostCursorBuffer())) {
                     try self.pre_cursor_buffer.appendSlice(self.validPostCursorBuffer());
                     _ = try self.output.write("\r\n");
-                    _ = try self.output.flush();
                     return;
                 }
 
@@ -210,20 +218,26 @@ pub fn InteractiveCli(comptime setting: Settings) type {
                 _ = try self.output.write(input);
                 _ = try self.writePostCursorBuffer();
 
-                // TODO: consider async flushing
-                _ = try self.output.flush();
+                // _ = try self.printSuggestions();
 
                 // TODO: generate autocompletion after flush?
             }
         }
 
-        //TODO:
-        fn printSuggestion(self: Self) !void {
-            _ = self;
-            // comptime_settings.max_suggestion_count;
+        //TODO: sort suggestions
+        fn printSuggestions(self: *Self) !void {
+            const suggest = self.suggest orelse return;
+            const suggestions = suggest(self.validPreCursorBuffer(), self.validPostCursorBuffer());
+            if (suggestions.len == 0) {
+                return;
+            }
 
-            //
+            // const max_text_len = maxSuggestionTextLen(suggestions);
+            // for (suggestions[0..suggestions.len-1]) |suggestion| {
+            //     try self.output.writer().print("\n{s}",.{suggestion.text});
+            // }
 
+            try self.log_var_to_file(suggestions, "suggestions");
         }
 
         fn prependPostCursorBuffer(self: *Self, bytes: []const u8) !void {
@@ -260,7 +274,7 @@ pub fn InteractiveCli(comptime setting: Settings) type {
                 return;
             }
             _ = try self.output.write(self.post_cursor_buffer[self.post_cursor_position..]);
-            try self.printf("\x1b[{d}D", .{to_move_left});
+            try self.print("\x1b[{d}D", .{to_move_left});
         }
 
         // return true if handled
@@ -277,7 +291,7 @@ pub fn InteractiveCli(comptime setting: Settings) type {
 
         /// keybind
         fn handleCtrlC(self: *Self) !void {
-            try self.printf("\n", .{});
+            try self.print("\n", .{});
             self.invalidatePreCursorBuffer();
             self.invalidatePostCursorBuffer();
             try self.reDraw();
@@ -286,14 +300,14 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         /// keybind
         fn handleBackspace(self: *Self) !void {
             _ = self.pre_cursor_buffer.pop() orelse return;
-            try self.printf("\x1b[D", .{}); // move cursor left
-            try self.printf("\x1b[K", .{}); // clear from cursor to end of line
+            try self.print("\x1b[D", .{}); // move cursor left
+            try self.print("\x1b[K", .{}); // clear from cursor to end of line
 
             // handle post cursor buffer
             const post_cursor_input = self.validPostCursorBuffer();
             if (post_cursor_input.len > 0) {
-                try self.printf("{s}", .{self.validPostCursorBuffer()}); // print post cursor buffer
-                try self.printf("\x1b[{d}D", .{self.validPostCursorBuffer().len}); // move cursor left proportionally to len of post cursor buffer
+                try self.print("{s}", .{self.validPostCursorBuffer()}); // print post cursor buffer
+                try self.print("\x1b[{d}D", .{self.validPostCursorBuffer().len}); // move cursor left proportionally to len of post cursor buffer
             }
         }
 
@@ -301,7 +315,7 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         fn moveCursorLeft(self: *Self) !void {
             const byte = self.pre_cursor_buffer.pop() orelse return;
             try self.prependPostCursorBuffer(&[_]u8{byte});
-            try self.printf("\x1b[D", .{});
+            try self.print("\x1b[D", .{});
         }
 
         /// keybind
@@ -313,7 +327,7 @@ pub fn InteractiveCli(comptime setting: Settings) type {
             const byte_after_cursor = self.post_cursor_buffer[self.post_cursor_position];
             try self.pre_cursor_buffer.append(byte_after_cursor);
             self.post_cursor_position += 1;
-            try self.printf("\x1b[C", .{});
+            try self.print("\x1b[C", .{});
         }
 
         /// keybind
@@ -362,14 +376,14 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         /// reDraws the prompt for user to see
         fn reDraw(self: *Self) !void {
             // move cursor to the beginning of the line & clear the line
-            try self.printf("\r\x1b[K", .{});
+            try self.print("\r\x1b[K", .{});
             try self.printPrompt();
             try self.printCurrentInput();
         }
 
         inline fn printCurrentInput(self: *Self) !void {
-            try self.printf("{s}", .{self.validPreCursorBuffer()});
-            try self.printf("{s}", .{self.validPostCursorBuffer()});
+            try self.print("{s}", .{self.validPreCursorBuffer()});
+            try self.print("{s}", .{self.validPostCursorBuffer()});
         }
 
         inline fn setRawInputMode(self: *Self) !void {
@@ -380,8 +394,11 @@ pub fn InteractiveCli(comptime setting: Settings) type {
             try termios.setTermios(self.tty, self.original_termios);
         }
 
-        inline fn printf(self: *Self, comptime fmt: []const u8, args: anytype) !void {
-            try std.fmt.format(self.output.writer(), fmt, args);
+        inline fn print(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+            try self.output.writer().print(fmt, args);
+        }
+
+        inline fn flush(self: *Self) !void {
             _ = try self.output.flush();
         }
 
@@ -431,8 +448,23 @@ pub const Settings = struct {
     prompt: []const u8 = "> ",
 
     max_suggestion_count: usize = 5,
-    suggest_function: ?*const fn ([]const u8, usize) [][]const u8 = null,
+    suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) []Suggestion = null,
 };
+
+pub const Suggestion = struct {
+    text: []const u8,
+    description: ?[]const u8 = null,
+};
+
+fn maxSuggestionTextLen(suggestions: []Suggestion) usize {
+    var max_len: usize = 0;
+    for (suggestions) |suggestion| {
+        if (suggestion.text.len > max_len) {
+            max_len = suggestion.text.len;
+        }
+    }
+    return max_len;
+}
 
 fn isEnd(byte: u8) bool {
     return byte == '\r';
