@@ -20,6 +20,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         const RingBufferedReader = ring_buffered_reader.RingBufferedReader(std.fs.File.Reader, settings.input_buffer_size);
         const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, settings.input_buffer_size);
         const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), settings.history_size);
+        const CursorMover = CursorMoverOf(RingBufferedWriter.Writer);
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
@@ -49,6 +50,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         /// io buffered readers/writers
         input: RingBufferedReader,
         output: RingBufferedWriter,
+        cursor_mover: CursorMover,
 
         /// history handling
         /// (when user presses up or down to select previously executed commands)
@@ -75,10 +77,10 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
         /// suggestion handling
         max_suggestion_count: usize = settings.max_suggestion_count,
-        suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) []Suggestion = settings.suggest,
+        suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) anyerror![]Suggestion = settings.suggest,
         preSuggestionLeftOffset: *const fn (input_pre_cursor: []const u8) usize = settings.preSuggestionLeftOffset,
         current_suggestions: []Suggestion = undefined,
-        displayed_suggestions: [settings.max_suggestion_count]Suggestion = undefined,
+        displayed_suggestions: [settings.max_suggestion_count]Suggestion = [_]Suggestion{Suggestion{}} ** settings.max_suggestion_count,
 
         /// file that collects all logs
         log_file: ?File,
@@ -90,6 +92,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             }
             var input = RingBufferedReader.init(tty.reader());
             var output = RingBufferedWriter.init(tty.writer());
+            var cursor_mover = CursorMover.init(output.writer());
 
             const original_termios = try std.os.tcgetattr(tty.handle);
             const raw_mode_termios = termios.getRawModeTermios(original_termios);
@@ -109,6 +112,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 .tty = tty,
                 .input = input,
                 .output = output,
+                .cursor_mover = cursor_mover,
                 .original_termios = original_termios,
                 .raw_mode_termios = raw_mode_termios,
                 .allocator = allocator,
@@ -133,6 +137,14 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         }
 
         pub fn run(self: *Self) !void {
+            const T = CursorMoverOf2(RingBufferedWriter);
+            var c = T.init(&self.output);
+            try c.testPrint();
+            _ = try self.output.flush();
+            try self.log_var_to_file(c.writer.buffer.buffer[0..20], "c.writer");
+            try self.log_var_to_file(self.output.buffer.buffer[0..20], "self.output");
+
+
             while (true) {
                 try self.readUserInput();
                 if (self.execute(self.pre_cursor_buffer.getAll())) {
@@ -191,6 +203,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             defer self.setOriginalInputMode() catch |err| {
                 self.log_to_file("Failed to set original input mode: {any}", .{err}) catch unreachable;
             };
+            defer self.clearSuggestions() catch unreachable;
 
             self.pre_cursor_buffer.truncate(0);
             self.post_cursor_position = self.post_cursor_buffer.len;
@@ -219,39 +232,57 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 _ = try self.output.write(input);
                 _ = try self.writePostCursorBuffer();
 
-                _ = try self.printSuggestions();
+                try self.computeSuggestions();
 
+                _ = try self.printSuggestions();
                 // TODO: generate autocompletion after flush?
             }
         }
 
-        // TODO: teardown after app ends
-        // TODO: sort suggestions
-        fn printSuggestions(self: *Self) !void {
+        fn clearSuggestions(self: *Self) !void {
+            const bytes = ("\n\x1b[2K" ** (self.displayed_suggestions.len + 1))
+                ++ ("\x1b[A" ** (self.displayed_suggestions.len + 1));
+            try self.print("{s}", .{bytes});
+        }
+
+        fn computeSuggestions(self: *Self) !void {
             const suggest = self.suggest orelse return;
-            const suggestions = suggest(self.validPreCursorBuffer(), self.validPostCursorBuffer());
-            if (suggestions.len == 0) {
+            self.current_suggestions = try suggest(self.validPreCursorBuffer(), self.validPostCursorBuffer());
+        }
+
+        // TODO: teardown after app ends
+        fn printSuggestions(self: *Self) !void {
+            if (self.current_suggestions.len == 0) {
                 return;
             }
 
             // TODO: incorporate max_suggestions count
-            const max_text_len = maxSuggestionTextLen(suggestions);
+            const max_text_len = maxSuggestionTextLen(self.current_suggestions);
 
             const pre_suggestion_left_offset = self.preSuggestionLeftOffset(self.validPreCursorBuffer());
 
-            try self.log_var_to_file(pre_suggestion_left_offset, "pre_suggestion_left_offset");
-
-            for (suggestions) |suggestion| {
+            for (self.current_suggestions) |suggestion| {
                 if (pre_suggestion_left_offset > 0) {
                     try self.output.writer().print("\x1b[{d}D", .{pre_suggestion_left_offset});
                 }
+
                 try self.output.writer().print("\n\x1b[2K{s}", .{suggestion.text});
                 try self.output.writer().writeByteNTimes(' ', max_text_len - suggestion.text.len);
                 const description = suggestion.description orelse continue;
-                try self.output.writer().print(":{s}", .{description});
-                try self.output.writer().print("\x1b[{d}D", .{max_text_len + description.len + 1 - pre_suggestion_left_offset});
+                try self.output.writer().print(": {s}", .{description});
+
+                try self.log_var_to_file(max_text_len, "max_text_len");
+                try self.log_var_to_file(description.len, "description.len");
+                try self.log_var_to_file(pre_suggestion_left_offset, "pre_suggestion_left_offset");
+
+                try self.output.writer().print("\x1b[{d}D", .{description.len + max_text_len + 1});
+                // try self.cursor_mover.moveLeft(description.len + max_text_len + 1);
+
+                // try self.cursor_mover.moveLeft(description.len + max_text_len);
+                // try self.cursor_mover.moveHorizontal(max_text_len + description.len + 1, pre_suggestion_left_offset);
             }
-            try self.output.writer().print("\x1b[{d}A", .{suggestions.len});
+
+            try self.output.writer().print("\x1b[{d}A", .{self.current_suggestions.len});
         }
 
         fn prependPostCursorBuffer(self: *Self, bytes: []const u8) !void {
@@ -463,11 +494,11 @@ pub const Settings = struct {
     prompt: []const u8 = "> ",
 
     max_suggestion_count: usize = 5,
-    suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) []Suggestion = null,
+    suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) anyerror![]Suggestion = null,
 };
 
 pub const Suggestion = struct {
-    text: []const u8,
+    text: []const u8 = "",
     description: ?[]const u8 = null,
 };
 
@@ -484,3 +515,62 @@ fn maxSuggestionTextLen(suggestions: []Suggestion) usize {
 fn isEnd(byte: u8) bool {
     return byte == '\r';
 }
+
+/// Writer is of type: std.io.Writer
+fn CursorMoverOf(comptime Writer: type) type {
+    return struct{
+        const Self = @This();
+
+        writer: Writer,
+
+        pub fn init(w: Writer) Self {
+            return .{
+                .writer = w,
+            };
+        }
+
+        pub fn moveHorizontal(self: Self, left: usize, right: usize) !void {
+            if (left > right) {
+                return self.moveLeft(left - right);
+            }
+            if (right > left) {
+                return self.moveRight(right - left);
+            }
+        }
+
+        pub fn moveLeft(self: *Self, n: usize) !void {
+            try self.writer.print("\x1b[{d}D", .{n});
+        }
+
+        pub fn moveRight(self: *Self, n: usize) !void {
+            try self.writer.print("\x1b[{d}C", .{n});
+        }
+
+        pub fn testPrint(self: *Self) !void {
+            _ = try self.writer.write("Hello World");
+        }
+    };
+}
+
+fn CursorMoverOf2(comptime Writer: type) type {
+    return struct{
+        const Self = @This();
+
+        writer: Writer,
+
+        pub fn init(w: *Writer) Self {
+            return .{
+                .writer = w.*,
+            };
+        }
+
+        pub fn testPrint(self: *Self) !void {
+            _ = try self.writer.writer().write("testPrint\n\n");
+            _ = try self.writer.flush();
+        }
+    };
+}
+
+// TODO: inform user to Sort and Filter, but provide default implementation
+
+// TODO: inform user to Sort and Filter, but provide default implementation

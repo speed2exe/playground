@@ -48,12 +48,13 @@ fn execute(cmd: []const u8) bool {
 
 //
 
-var s = [2]icli.Suggestion{
+var s = [_]icli.Suggestion{
     .{ .text = "foo", .description = "foo description" },
     .{ .text = "bar", .description = "bar description" },
+    .{ .text = "baz", .description = "baz description" },
 };
 
-fn suggest(pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) []icli.Suggestion {
+fn suggest(pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) ![]icli.Suggestion {
     _ = pre_cursor_buffer;
     _ = post_cursor_buffer;
     return &s;
