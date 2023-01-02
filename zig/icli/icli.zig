@@ -14,12 +14,12 @@ const termios = switch (builtin.os.tag) {
     else => @import("./termios_c.zig"),
 };
 
-pub fn InteractiveCli(comptime setting: Settings) type {
+pub fn InteractiveCli(comptime settings: Settings) type {
     return struct {
         const Self = @This();
-        const RingBufferedReader = ring_buffered_reader.RingBufferedReader(std.fs.File.Reader, setting.input_buffer_size);
-        const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, setting.input_buffer_size);
-        const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), setting.history_size);
+        const RingBufferedReader = ring_buffered_reader.RingBufferedReader(std.fs.File.Reader, settings.input_buffer_size);
+        const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, settings.input_buffer_size);
+        const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), settings.history_size);
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
@@ -34,17 +34,17 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         });
 
         // Prompt (the thing before user input, e.g. "> ")
-        prompt: []const u8 = setting.prompt, // TODO: use enum to allow for different prompts (e.g. dynamic prompt)
+        prompt: []const u8 = settings.prompt, // TODO: use enum to allow for different prompts (e.g. dynamic prompt)
 
         // Execution
-        execute: *const fn ([]const u8) bool = setting.execute, // TODO: reconsider signature
+        execute: *const fn ([]const u8) bool = settings.execute, // TODO: reconsider signature
 
         // variables that are pretty much unchanged once initialized
         original_termios: std.os.termios,
         raw_mode_termios: std.os.termios,
         allocator: std.mem.Allocator,
         tty: File,
-        isEndOfUserInput: *const fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = setting.isEndOfUserInput,
+        isEndOfUserInput: *const fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = settings.isEndOfUserInput,
 
         /// io buffered readers/writers
         input: RingBufferedReader,
@@ -53,7 +53,7 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         /// history handling
         /// (when user presses up or down to select previously executed commands)
         history: History = History{},
-        history_size: usize = setting.history_size,
+        history_size: usize = settings.history_size,
         history_selected: ?*History.Node = null, // current history node that user is using
         backup_buffer: array_list.Array(u8),
 
@@ -74,10 +74,11 @@ pub fn InteractiveCli(comptime setting: Settings) type {
         post_cursor_position: usize = 0,
 
         /// suggestion handling
-        max_suggestion_count: usize = setting.max_suggestion_count,
-        suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) []Suggestion = setting.suggest,
+        max_suggestion_count: usize = settings.max_suggestion_count,
+        suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) []Suggestion = settings.suggest,
+        preSuggestionLeftOffset: *const fn (input_pre_cursor: []const u8) usize = settings.preSuggestionLeftOffset,
         current_suggestions: []Suggestion = undefined,
-        displayed_suggestions: [setting.max_suggestion_count]Suggestion = undefined,
+        displayed_suggestions: [settings.max_suggestion_count]Suggestion = undefined,
 
         /// file that collects all logs
         log_file: ?File,
@@ -99,7 +100,7 @@ pub fn InteractiveCli(comptime setting: Settings) type {
 
             // const log_file = null;
             const log_file = blk: {
-                const log_path = setting.log_file_path orelse break :blk null;
+                const log_path = settings.log_file_path orelse break :blk null;
                 const log_file = try std.fs.cwd().createFile(log_path, .{});
                 break :blk log_file;
             };
@@ -218,13 +219,14 @@ pub fn InteractiveCli(comptime setting: Settings) type {
                 _ = try self.output.write(input);
                 _ = try self.writePostCursorBuffer();
 
-                // _ = try self.printSuggestions();
+                _ = try self.printSuggestions();
 
                 // TODO: generate autocompletion after flush?
             }
         }
 
-        //TODO: sort suggestions
+        // TODO: teardown after app ends
+        // TODO: sort suggestions
         fn printSuggestions(self: *Self) !void {
             const suggest = self.suggest orelse return;
             const suggestions = suggest(self.validPreCursorBuffer(), self.validPostCursorBuffer());
@@ -232,12 +234,24 @@ pub fn InteractiveCli(comptime setting: Settings) type {
                 return;
             }
 
-            // const max_text_len = maxSuggestionTextLen(suggestions);
-            // for (suggestions[0..suggestions.len-1]) |suggestion| {
-            //     try self.output.writer().print("\n{s}",.{suggestion.text});
-            // }
+            // TODO: incorporate max_suggestions count
+            const max_text_len = maxSuggestionTextLen(suggestions);
 
-            try self.log_var_to_file(suggestions, "suggestions");
+            const pre_suggestion_left_offset = self.preSuggestionLeftOffset(self.validPreCursorBuffer());
+
+            try self.log_var_to_file(pre_suggestion_left_offset, "pre_suggestion_left_offset");
+
+            for (suggestions) |suggestion| {
+                if (pre_suggestion_left_offset > 0) {
+                    try self.output.writer().print("\x1b[{d}D", .{pre_suggestion_left_offset});
+                }
+                try self.output.writer().print("\n\x1b[2K{s}", .{suggestion.text});
+                try self.output.writer().writeByteNTimes(' ', max_text_len - suggestion.text.len);
+                const description = suggestion.description orelse continue;
+                try self.output.writer().print(":{s}", .{description});
+                try self.output.writer().print("\x1b[{d}D", .{max_text_len + description.len + 1 - pre_suggestion_left_offset});
+            }
+            try self.output.writer().print("\x1b[{d}A", .{suggestions.len});
         }
 
         fn prependPostCursorBuffer(self: *Self, bytes: []const u8) !void {
@@ -443,6 +457,7 @@ pub const Settings = struct {
     history_size: usize = 100,
     log_file_path: ?[]const u8 = null,
     isEndOfUserInput: fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = defaults.isEndOfUserInput,
+    preSuggestionLeftOffset: fn (input_pre_cursor: []const u8) usize = defaults.preSuggestionLeftOffset,
 
     execute: *const fn ([]const u8) bool,
     prompt: []const u8 = "> ",

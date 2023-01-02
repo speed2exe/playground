@@ -9,6 +9,17 @@ pub fn isEndOfUserInput(keypress: []const u8, input_pre_cursor: []const u8, inpu
     return std.mem.eql(u8, keypress, "\r");
 }
 
-pub fn keymap() void {
-    std.AutoHashMap([]const u8, fn () void);
+// number of steps to move left before pring the suggestion
+pub fn preSuggestionLeftOffset(input_pre_cursor: []const u8) usize {
+    var result: usize = 0;
+
+    var i = input_pre_cursor.len;
+    while (i > 0) : (i -= 1) {
+        if (input_pre_cursor[i - 1] == ' ') {
+            break;
+        }
+        result += 1;
+    }
+
+    return result;
 }
