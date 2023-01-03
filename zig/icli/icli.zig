@@ -264,27 +264,23 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
             // TODO: incorporate max_suggestions count
             const max_text_len = maxSuggestionTextLen(self.current_suggestions);
+            self.log_var_to_file(max_text_len, "max_text_len") catch unreachable;
 
             const pre_suggestion_left_offset = self.preSuggestionLeftOffset(self.validPreCursorBuffer());
+            self.log_var_to_file(pre_suggestion_left_offset, "pre_suggestion_left_offset") catch unreachable;
 
             for (self.current_suggestions) |suggestion| {
-                if (pre_suggestion_left_offset > 0) {
-                    try self.escape_sequence_writer.cursorMoveLeft(pre_suggestion_left_offset);
-                }
-
-                try self.output.writer().print("\n\x1b[2K{s}", .{suggestion.text});
+                try self.escape_sequence_writer.cursorMoveLeft(pre_suggestion_left_offset);
+                try self.output.writer().print("\n", .{});
+                try self.escape_sequence_writer.eraseEntireLine();
+                try self.print("{s}", .{suggestion.text});
                 try self.output.writer().writeByteNTimes(' ', max_text_len - suggestion.text.len);
-                const description = suggestion.description orelse continue;
-                try self.output.writer().print(": {s}", .{description});
-
-                try self.log_var_to_file(max_text_len, "max_text_len");
-                try self.log_var_to_file(description.len, "description.len");
-                try self.log_var_to_file(pre_suggestion_left_offset, "pre_suggestion_left_offset");
-
+                const description = suggestion.description orelse "";
+                try self.output.writer().print("||{s}", .{description});
                 try self.escape_sequence_writer.cursorMoveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
             }
 
-            try self.output.writer().print("\x1b[{d}A", .{self.current_suggestions.len});
+            try self.escape_sequence_writer.cursorMoveUp(self.current_suggestions.len);
         }
 
         fn prependPostCursorBuffer(self: *Self, bytes: []const u8) !void {
@@ -321,7 +317,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 return;
             }
             _ = try self.output.write(self.post_cursor_buffer[self.post_cursor_position..]);
-            try self.print("\x1b[{d}D", .{to_move_left});
+            try self.escape_sequence_writer.cursorMoveLeft(to_move_left);
         }
 
         // return true if handled
@@ -523,3 +519,4 @@ fn isEnd(byte: u8) bool {
 // TODO: ignore undefined keys, like F1, F2, Alt+??, Ctrl+??, etc.
 // TODO: clean up completion after quit (ctrl-D)
 // TODO: Issue: Still seeing suggestion after execute
+// TODO: print suggestion with color
