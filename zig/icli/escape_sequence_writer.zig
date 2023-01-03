@@ -24,15 +24,34 @@ pub fn EscapeSequenceWriter(comptime WriterType: type) type {
         }
 
         pub fn moveLeft(self: *Self, n: usize) !void {
-            try self.writer.print("\x1b[{d}D", .{n});
+            try self.print("\x1b[{d}D", .{n});
         }
 
         pub fn moveRight(self: *Self, n: usize) !void {
-            try self.writer.print("\x1b[{d}C", .{n});
+            try self.print("\x1b[{d}C", .{n});
         }
 
-        pub fn testPrint(self: *Self) !void {
-            try self.writer.print("testPrint\n", .{});
+        // Clear from cursor to the end of the line.
+        // Cursor position does not change.
+        pub fn EraseFromCursorToEnd(self: *Self) !void {
+            try self.print("\r\x1b[K", .{});
         }
+
+        // Clear from cursor to beginning of the line.
+        // Cursor position does not change.
+        pub fn EraseFromBeginningToCursor(self: *Self) !void {
+            try self.print("\r\x1b[1K", .{});
+        }
+
+        // Clear entire line.
+        // Cursor position does not change.
+        pub fn EraseEntireLine(self: *Self) !void {
+            try self.print("\r\x1b[2K", .{});
+        }
+
+        inline fn print(self: *Self, comptime format: []const u8, args: anytype) !void {
+            try self.writer.print(format, args);
+        }
+
     };
 }
