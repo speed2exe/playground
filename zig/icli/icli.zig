@@ -27,13 +27,13 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
         const keybind_by_keypress = std.ComptimeStringMap(*const fn (self: *Self) anyerror!void, .{
-            .{ &[_]u8{3}, Self.keybindCtrlC },
-            .{ &[_]u8{4}, Self.keybindCtrlD },
-            .{ &[_]u8{127}, Self.keybindBackspace },
-            .{ "\x1b[A", Self.keybindUp },
-            .{ "\x1b[B", Self.keybindDown },
-            .{ "\x1b[C", Self.keybindRight },
-            .{ "\x1b[D", Self.keybindLeft },
+            .{ escape_sequence.ctrl_c, Self.keybindCtrlC },
+            .{ escape_sequence.ctrl_d, Self.keybindCtrlD },
+            .{ escape_sequence.backspace, Self.keybindBackspace },
+            .{ escape_sequence.up, Self.keybindUp },
+            .{ escape_sequence.down, Self.keybindDown },
+            .{ escape_sequence.right, Self.keybindRight },
+            .{ escape_sequence.left, Self.keybindLeft },
         });
 
         // Prompt (the thing before user input, e.g. "> ")
@@ -351,7 +351,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         fn keybindLeft(self: *Self) !void {
             const byte = self.pre_cursor_buffer.pop() orelse return;
             try self.prependPostCursorBuffer(&[_]u8{byte});
-            try self.print("\x1b[D", .{});
+            try self.escape_sequence_writer.cursorMoveLeft(1);
         }
 
         fn keybindRight(self: *Self) !void {
@@ -362,7 +362,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             const byte_after_cursor = self.post_cursor_buffer[self.post_cursor_position];
             try self.pre_cursor_buffer.append(byte_after_cursor);
             self.post_cursor_position += 1;
-            try self.print("\x1b[C", .{});
+            try self.escape_sequence_writer.cursorMoveRight(1);
         }
 
         fn keybindUp(self: *Self) !void {
@@ -408,8 +408,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
         /// reDraws the prompt for user to see
         fn reDraw(self: *Self) !void {
-            // move cursor to the beginning of the line & clear the line
-            try self.print("\r\x1b[K", .{});
+            try self.print("\r", .{}); // move cursor to the beginning of the line
             try self.escape_sequence_writer.eraseFromCursorToEnd();
             try self.printPrompt();
             try self.printCurrentInput();
