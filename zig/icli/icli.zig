@@ -6,6 +6,7 @@ const ring_buffered_reader = @import("./ring_buffered_reader.zig");
 const ring_buffered_writer = @import("./ring_buffered_writer.zig");
 const defaults = @import("./defaults.zig");
 const tree_print = @import("./tree_print.zig");
+const escape_sequence = @import("./escape_sequence.zig");
 const escape_sequence_writer = @import("./escape_sequence_writer.zig");
 const File = std.fs.File;
 const OpenMode = std.fs.File.OpenMode;
@@ -240,8 +241,14 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         }
 
         fn clearSuggestions(self: *Self) !void {
-            const bytes = ("\n\x1b[2K" ** (self.displayed_suggestions.len + 1)) ++ ("\x1b[A" ** (self.displayed_suggestions.len + 1));
-            try self.print("{s}", .{bytes});
+            const sequences: []const u8 = blk: {
+                comptime {
+                    const clear_lines_down = ("\n" ++ escape_sequence.clear_entire_line) ** (self.displayed_suggestions.len);
+                    const move_ups = escape_sequence.move_up_once ** self.displayed_suggestions.len;
+                    break :blk move_ups ++ clear_lines_down;
+                }
+            };
+            try self.print(sequences, .{});
         }
 
         fn computeSuggestions(self: *Self) !void {
