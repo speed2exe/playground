@@ -27,13 +27,13 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
         const keybind_by_keypress = std.ComptimeStringMap(*const fn (self: *Self) anyerror!void, .{
-            .{ &[_]u8{3}, Self.handleCtrlC }, // ctrl-c
-            .{ &[_]u8{4}, Self.handleCtrlD }, // ctrl-d
-            .{ &[_]u8{127}, Self.handleBackspace }, // backspace
-            .{ "\x1b[A", Self.selectLessRecent }, // up
-            .{ "\x1b[B", Self.selectMoreRecent }, // down
-            .{ "\x1b[C", Self.moveCursorRight }, // right
-            .{ "\x1b[D", Self.moveCursorLeft }, // left
+            .{ &[_]u8{3}, Self.keybindCtrlC },
+            .{ &[_]u8{4}, Self.keybindCtrlD },
+            .{ &[_]u8{127}, Self.keybindBackspace },
+            .{ "\x1b[A", Self.keybindUp },
+            .{ "\x1b[B", Self.keybindDown },
+            .{ "\x1b[C", Self.keybindRight },
+            .{ "\x1b[D", Self.keybindLeft },
         });
 
         // Prompt (the thing before user input, e.g. "> ")
@@ -264,10 +264,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
             // TODO: incorporate max_suggestions count
             const max_text_len = maxSuggestionTextLen(self.current_suggestions);
-            self.log_var_to_file(max_text_len, "max_text_len") catch unreachable;
-
             const pre_suggestion_left_offset = self.preSuggestionLeftOffset(self.validPreCursorBuffer());
-            self.log_var_to_file(pre_suggestion_left_offset, "pre_suggestion_left_offset") catch unreachable;
 
             for (self.current_suggestions) |suggestion| {
                 try self.escape_sequence_writer.cursorMoveLeft(pre_suggestion_left_offset);
@@ -327,42 +324,37 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             return true;
         }
 
-        /// keybind
-        fn handleCtrlD(_: *Self) !void {
+        fn keybindCtrlD(_: *Self) !void {
             return error.Quit;
         }
 
-        /// keybind
-        fn handleCtrlC(self: *Self) !void {
+        fn keybindCtrlC(self: *Self) !void {
             try self.print("\n", .{});
             self.invalidatePreCursorBuffer();
             self.invalidatePostCursorBuffer();
             try self.reDraw();
         }
 
-        /// keybind
-        fn handleBackspace(self: *Self) !void {
+        fn keybindBackspace(self: *Self) !void {
             _ = self.pre_cursor_buffer.pop() orelse return;
-            try self.print("\x1b[D", .{}); // move cursor left
-            try self.print("\x1b[K", .{}); // clear from cursor to end of line
+            try self.escape_sequence_writer.cursorMoveLeft(1);
+            try self.escape_sequence_writer.eraseFromCursorToEnd();
 
             // handle post cursor buffer
             const post_cursor_input = self.validPostCursorBuffer();
             if (post_cursor_input.len > 0) {
                 try self.print("{s}", .{self.validPostCursorBuffer()}); // print post cursor buffer
-                try self.print("\x1b[{d}D", .{self.validPostCursorBuffer().len}); // move cursor left proportionally to len of post cursor buffer
+                try self.escape_sequence_writer.cursorMoveLeft(self.validPostCursorBuffer().len);
             }
         }
 
-        /// keybind
-        fn moveCursorLeft(self: *Self) !void {
+        fn keybindLeft(self: *Self) !void {
             const byte = self.pre_cursor_buffer.pop() orelse return;
             try self.prependPostCursorBuffer(&[_]u8{byte});
             try self.print("\x1b[D", .{});
         }
 
-        /// keybind
-        fn moveCursorRight(self: *Self) !void {
+        fn keybindRight(self: *Self) !void {
             if (self.post_cursor_position == self.post_cursor_buffer.len) {
                 return;
             }
@@ -373,8 +365,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             try self.print("\x1b[C", .{});
         }
 
-        /// keybind
-        fn selectLessRecent(self: *Self) !void {
+        fn keybindUp(self: *Self) !void {
             const history_selected = self.history_selected orelse {
                 self.history_selected = self.history.head orelse return;
                 self.switchInputBuffer();
@@ -389,8 +380,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             try self.reDraw();
         }
 
-        /// keybind
-        fn selectMoreRecent(self: *Self) !void {
+        fn keybindDown(self: *Self) !void {
             const history_selected = self.history_selected orelse return;
             const more_recent_node = history_selected.prev orelse {
                 self.history_selected = null;
