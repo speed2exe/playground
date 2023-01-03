@@ -6,6 +6,7 @@ const ring_buffered_reader = @import("./ring_buffered_reader.zig");
 const ring_buffered_writer = @import("./ring_buffered_writer.zig");
 const defaults = @import("./defaults.zig");
 const tree_print = @import("./tree_print.zig");
+const escape_sequence_writer = @import("./escape_sequence_writer.zig");
 const File = std.fs.File;
 const OpenMode = std.fs.File.OpenMode;
 const termios = switch (builtin.os.tag) {
@@ -20,7 +21,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         const RingBufferedReader = ring_buffered_reader.RingBufferedReader(std.fs.File.Reader, settings.input_buffer_size);
         const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, settings.input_buffer_size);
         const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), settings.history_size);
-        const CursorMover = CursorMoverOf(RingBufferedWriter);
+        const EscapeSequenceWriter = escape_sequence_writer.EscapeSequenceWriter(RingBufferedWriter);
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
@@ -50,7 +51,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         /// io buffered readers/writers
         input: RingBufferedReader,
         output: RingBufferedWriter,
-        cursor_mover: CursorMover,
+        escape_sequence_writer: EscapeSequenceWriter,
 
         /// history handling
         /// (when user presses up or down to select previously executed commands)
@@ -108,7 +109,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 .tty = tty,
                 .input = undefined,
                 .output = undefined,
-                .cursor_mover = undefined,
+                .escape_sequence_writer = undefined,
                 .original_termios = original_termios,
                 .raw_mode_termios = undefined,
                 .allocator = allocator,
@@ -136,7 +137,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             if (self.done_pre_run_setup) return;
             self.input = RingBufferedReader.init(self.tty.reader());
             self.output = RingBufferedWriter.init(self.tty.writer());
-            self.cursor_mover = CursorMover.init(&self.output);
+            self.escape_sequence_writer = EscapeSequenceWriter.init(&self.output);
             self.raw_mode_termios = termios.getRawModeTermios(self.original_termios);
             self.done_pre_run_setup = true;
         }
@@ -274,10 +275,10 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 try self.log_var_to_file(pre_suggestion_left_offset, "pre_suggestion_left_offset");
 
                 // try self.output.writer().print("\x1b[{d}D", .{description.len + max_text_len + 1});
-                // try self.cursor_mover.moveLeft(description.len + max_text_len + 1);
+                // try self.escape_sequence_writer.moveLeft(description.len + max_text_len + 1);
 
-                // try self.cursor_mover.moveLeft(description.len + max_text_len);
-                try self.cursor_mover.moveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
+                // try self.escape_sequence_writer.moveLeft(description.len + max_text_len);
+                try self.escape_sequence_writer.moveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
             }
 
             try self.output.writer().print("\x1b[{d}A", .{self.current_suggestions.len});
@@ -512,43 +513,6 @@ fn maxSuggestionTextLen(suggestions: []Suggestion) usize {
 
 fn isEnd(byte: u8) bool {
     return byte == '\r';
-}
-
-/// Writer is of type: std.io.Writer
-fn CursorMoverOf(comptime WriterType: type) type {
-    return struct {
-        const Self = @This();
-        pub const Writer = WriterType.Writer;
-
-        writer: Writer,
-
-        pub fn init(w: *WriterType) Self {
-            return .{
-                .writer = .{ .context = w },
-            };
-        }
-
-        pub fn moveHorizontal(self: *Self, left: usize, right: usize) !void {
-            if (left > right) {
-                return self.moveLeft(left - right);
-            }
-            if (right > left) {
-                return self.moveRight(right - left);
-            }
-        }
-
-        pub fn moveLeft(self: *Self, n: usize) !void {
-            try self.writer.print("\x1b[{d}D", .{n});
-        }
-
-        pub fn moveRight(self: *Self, n: usize) !void {
-            try self.writer.print("\x1b[{d}C", .{n});
-        }
-
-        pub fn testPrint(self: *Self) !void {
-            try self.writer.print("testPrint\n", .{});
-        }
-    };
 }
 
 // TODO: inform user to Sort and Filter, but provide default implementation
