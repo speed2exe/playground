@@ -269,7 +269,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
             for (self.current_suggestions) |suggestion| {
                 if (pre_suggestion_left_offset > 0) {
-                    try self.output.writer().print("\x1b[{d}D", .{pre_suggestion_left_offset});
+                    try self.escape_sequence_writer.cursorMoveLeft(pre_suggestion_left_offset);
                 }
 
                 try self.output.writer().print("\n\x1b[2K{s}", .{suggestion.text});
@@ -281,11 +281,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 try self.log_var_to_file(description.len, "description.len");
                 try self.log_var_to_file(pre_suggestion_left_offset, "pre_suggestion_left_offset");
 
-                // try self.output.writer().print("\x1b[{d}D", .{description.len + max_text_len + 1});
-                // try self.escape_sequence_writer.moveLeft(description.len + max_text_len + 1);
-
-                // try self.escape_sequence_writer.moveLeft(description.len + max_text_len);
-                try self.escape_sequence_writer.moveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
+                try self.escape_sequence_writer.cursorMoveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
             }
 
             try self.output.writer().print("\x1b[{d}A", .{self.current_suggestions.len});
@@ -428,7 +424,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         fn reDraw(self: *Self) !void {
             // move cursor to the beginning of the line & clear the line
             try self.print("\r\x1b[K", .{});
-            try self.escape_sequence_writer.EraseFromCursorToEnd();
+            try self.escape_sequence_writer.eraseFromCursorToEnd();
             try self.printPrompt();
             try self.printCurrentInput();
         }

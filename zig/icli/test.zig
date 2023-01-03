@@ -11,7 +11,7 @@ pub fn main() !void {
 //         const Self = @This();
 //         a: T,
 //         b: T,
-// 
+//
 //         fn init(v: T) Self {
 //             return Self{
 //                 .a = v,
@@ -20,7 +20,6 @@ pub fn main() !void {
 //         }
 //     };
 // }
-
 
 // bugged
 // pub fn comptimePrint(n: comptime comptime_int) []const u8 {

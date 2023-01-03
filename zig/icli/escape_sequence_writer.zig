@@ -14,44 +14,43 @@ pub fn EscapeSequenceWriter(comptime WriterType: type) type {
             };
         }
 
-        pub fn moveHorizontal(self: *Self, left: usize, right: usize) !void {
+        pub fn cursorMoveHorizontal(self: *Self, left: usize, right: usize) !void {
             if (left > right) {
-                return self.moveLeft(left - right);
+                return self.cursorMoveLeft(left - right);
             }
             if (right > left) {
-                return self.moveRight(right - left);
+                return self.cursorMoveRight(right - left);
             }
         }
 
-        pub fn moveLeft(self: *Self, n: usize) !void {
+        pub fn cursorMoveLeft(self: *Self, n: usize) !void {
             try self.print("\x1b[{d}D", .{n});
         }
 
-        pub fn moveRight(self: *Self, n: usize) !void {
+        pub fn cursorMoveRight(self: *Self, n: usize) !void {
             try self.print("\x1b[{d}C", .{n});
         }
 
         // Clear from cursor to the end of the line.
         // Cursor position does not change.
-        pub fn EraseFromCursorToEnd(self: *Self) !void {
+        pub fn eraseFromCursorToEnd(self: *Self) !void {
             try self.print("\r\x1b[K", .{});
         }
 
         // Clear from cursor to beginning of the line.
         // Cursor position does not change.
-        pub fn EraseFromBeginningToCursor(self: *Self) !void {
+        pub fn eraseFromBeginningToCursor(self: *Self) !void {
             try self.print("\r\x1b[1K", .{});
         }
 
         // Clear entire line.
         // Cursor position does not change.
-        pub fn EraseEntireLine(self: *Self) !void {
+        pub fn eraseEntireLine(self: *Self) !void {
             try self.print("\r\x1b[2K", .{});
         }
 
         inline fn print(self: *Self, comptime format: []const u8, args: anytype) !void {
             try self.writer.print(format, args);
         }
-
     };
 }
