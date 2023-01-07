@@ -504,6 +504,7 @@ fn isEnd(byte: u8) bool {
     return byte == '\r';
 }
 
+// TODO: add context for suggestio, since there's no closure
 // TODO: inform user to Sort and Filter, but provide default implementation
 // TODO: ignore undefined keys, like F1, F2, Alt+??, Ctrl+??, etc.
 // TODO: clean up completion after quit (ctrl-D)
