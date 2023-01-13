@@ -3,28 +3,23 @@ const testing = std.testing;
 const ring_buffer = @import("./ring_buffer.zig");
 
 pub fn RingBufferedWriter(
-    comptime WriterType: type,
+    comptime Context: type,
+    comptime writeFn: fn (context: Context, buffer: []const u8) anyerror!usize,
     comptime buffer_size: comptime_int,
 ) type {
     return struct {
         const Self = @This();
-        pub const Error = WriterType.Error;
-        pub const Writer = std.io.Writer(*Self, Error, write);
         pub const RingBuffer = ring_buffer.RingBuffer(buffer_size);
 
-        dest: WriterType,
+        context: Context,
         buffer: RingBuffer = .{},
 
-        pub fn init(w: WriterType) Self {
-            return Self{ .dest = w };
-        }
-
-        pub fn writer(self: *Self) Writer {
-            return Writer{ .context = self };
+        pub fn init(context: Context) Self {
+            return Self{ .context = context };
         }
 
         // blocks until all bytes are written
-        pub fn write(self: *Self, src: []const u8) Error!usize {
+        pub fn write(self: *Self, src: []const u8) anyerror!usize {
             var total_written: usize = 0;
             while (total_written < src.len) {
                 const written = try self.buffer.write(src[total_written..]);
@@ -36,18 +31,17 @@ pub fn RingBufferedWriter(
             return total_written;
         }
 
-        pub fn flush(self: *Self) WriterType.Error!usize {
-            return self.buffer.writeTo(WriterType, self.dest);
+        pub fn flush(self: *Self) anyerror!usize {
+            return self.buffer.writeTo(Context, self.context, writeFn);
         }
     };
 }
 
 test "test RingBufferedWriter" {
-    const RingBuffer5 = ring_buffer.RingBuffer(20);
-    var some_ring_buffer = RingBuffer5.init();
-    var writer = some_ring_buffer.writer();
+    const RingBuffer20 = ring_buffer.RingBuffer(20);
+    var some_ring_buffer = RingBuffer20.init();
 
-    var ring_buffered_writer = RingBufferedWriter(RingBuffer5.Writer, 3).init(writer);
+    var ring_buffered_writer = RingBufferedWriter(*RingBuffer20, RingBuffer20.write, 3).init(&some_ring_buffer);
     {
         const n = try ring_buffered_writer.write("0123456789");
         const m = try ring_buffered_writer.flush();

@@ -19,10 +19,11 @@ const termios = switch (builtin.os.tag) {
 pub fn InteractiveCli(comptime settings: Settings) type {
     return struct {
         const Self = @This();
-        const RingBufferedReader = ring_buffered_reader.RingBufferedReader(std.fs.File.Reader, settings.input_buffer_size);
-        const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(std.fs.File.Writer, settings.input_buffer_size);
+        const RingBufferedReader = ring_buffered_reader.RingBufferedReader(File, File.read, settings.input_buffer_size);
+        const RingBufferedWriter = ring_buffered_writer.RingBufferedWriter(File, File.write, settings.input_buffer_size);
+        const RingBufferedWriterStd = std.io.Writer(*RingBufferedWriter, anyerror, RingBufferedWriter.write);
         const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), settings.history_size);
-        const EscapeSequenceWriter = escape_sequence_writer.EscapeSequenceWriter(RingBufferedWriter);
+        const EscapeSequenceWriter = escape_sequence_writer.EscapeSequenceWriter(*RingBufferedWriter, RingBufferedWriter.write);
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
@@ -52,6 +53,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         /// io buffered readers/writers
         input: RingBufferedReader,
         output: RingBufferedWriter,
+        output_std: RingBufferedWriterStd,
         escape_sequence_writer: EscapeSequenceWriter,
 
         /// history handling
@@ -110,6 +112,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 .tty = tty,
                 .input = undefined,
                 .output = undefined,
+                .output_std = undefined,
                 .escape_sequence_writer = undefined,
                 .original_termios = original_termios,
                 .raw_mode_termios = undefined,
@@ -136,8 +139,9 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
         fn preRun(self: *Self) void {
             if (self.done_pre_run_setup) return;
-            self.input = RingBufferedReader.init(self.tty.reader());
-            self.output = RingBufferedWriter.init(self.tty.writer());
+            self.input = RingBufferedReader.init(self.tty);
+            self.output = RingBufferedWriter.init(self.tty);
+            self.output_std = RingBufferedWriterStd{ .context = &self.output };
             self.escape_sequence_writer = EscapeSequenceWriter.init(&self.output);
             self.raw_mode_termios = termios.getRawModeTermios(self.original_termios);
             self.done_pre_run_setup = true;
@@ -268,12 +272,12 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
             for (self.current_suggestions) |suggestion| {
                 try self.escape_sequence_writer.cursorMoveLeft(pre_suggestion_left_offset);
-                try self.output.writer().print("\n", .{});
+                try self.print("\n", .{});
                 try self.escape_sequence_writer.eraseEntireLine();
                 try self.print("{s}", .{suggestion.text});
-                try self.output.writer().writeByteNTimes(' ', max_text_len - suggestion.text.len);
+                try self.output_std.writeByteNTimes(' ', max_text_len - suggestion.text.len);
                 const description = suggestion.description orelse "";
-                try self.output.writer().print("||{s}", .{description});
+                try self.output_std.print("||{s}", .{description});
                 try self.escape_sequence_writer.cursorMoveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
             }
 
@@ -428,7 +432,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         }
 
         inline fn print(self: *Self, comptime fmt: []const u8, args: anytype) !void {
-            try self.output.writer().print(fmt, args);
+            try self.output_std.print(fmt, args);
         }
 
         inline fn flush(self: *Self) !void {

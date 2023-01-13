@@ -1,11 +1,8 @@
 const std = @import("std");
 const testing = std.testing;
-const string_reader = @import("./string_reader.zig");
-const StringReader = string_reader.StringReader;
+const StringReader = @import("./string_reader.zig").StringReader;
 
-pub fn RingBuffer(
-    comptime buffer_size: comptime_int,
-) type {
+pub fn RingBuffer(comptime buffer_size: comptime_int) type {
     return struct {
         const Self = @This();
 
@@ -16,19 +13,8 @@ pub fn RingBuffer(
         // The index of the last byte in the buffer, exclusive
         tail: usize = 0,
 
-        pub const Reader = std.io.Reader(*Self, anyerror, read);
-        pub const Writer = std.io.Writer(*Self, anyerror, write);
-
         pub fn init() Self {
             return Self{};
-        }
-
-        pub fn reader(self: *Self) Reader {
-            return .{ .context = self };
-        }
-
-        pub fn writer(self: *Self) Writer {
-            return .{ .context = self };
         }
 
         pub fn read(self: *Self, dest: []u8) !usize {
@@ -40,13 +26,23 @@ pub fn RingBuffer(
         }
 
         // contents that is read from reader will be put into the buffer
-        pub fn readFrom(self: *Self, comptime ReaderType: type, r: ReaderType) ReaderType.Error!usize {
-            return try ringReadFrom(ReaderType, r, &self.buffer, &self.head, &self.tail);
+        pub fn readFrom(
+            self: *Self,
+            comptime Context: type,
+            context: Context,
+            readFn: fn (context: Context, dest: []u8) anyerror!usize,
+        ) !usize {
+            return try ringReadFrom(Context, context, readFn, &self.buffer, &self.head, &self.tail);
         }
 
         // writer will write as much contents as possible from the buffer
-        pub fn writeTo(self: *Self, comptime WriterType: type, w: WriterType) WriterType.Error!usize {
-            return try ringWriteTo(WriterType, w, &self.buffer, &self.head, self.tail);
+        pub fn writeTo(
+            self: *Self,
+            comptime Context: type,
+            context: Context,
+            writeFn: fn (context: Context, dest: []const u8) anyerror!usize,
+        ) !usize {
+            return try ringWriteTo(Context, context, writeFn, &self.buffer, &self.head, self.tail);
         }
 
         pub fn isFull(self: *Self) bool {
@@ -73,9 +69,10 @@ pub fn RingBuffer(
 }
 
 test "RingBuffer" {
-    var ring = RingBuffer(10).init();
-    var ring_reader = ring.reader();
-    var ring_writer = ring.writer();
+    const RingBuffer10 = RingBuffer(10);
+    var ring = RingBuffer10.init();
+    var ring_reader = std.io.Reader(*RingBuffer10, anyerror, RingBuffer10.read){ .context = &ring };
+    var ring_writer = std.io.Writer(*RingBuffer10, anyerror, RingBuffer10.write){ .context = &ring };
 
     {
         var buf = [_]u8{ 0, 0, 0 };
@@ -380,12 +377,13 @@ fn ringReadConst(buffer: []u8, head_ptr: *usize, tail: usize) []const u8 {
 
 // Implementation is very similiar to ringWrite
 fn ringReadFrom(
-    comptime ReaderType: type,
-    reader: ReaderType,
+    comptime Context: type,
+    context: Context,
+    readFn: fn (context: Context, buffer: []u8) anyerror!usize,
     buffer: []u8,
     head_ptr: *usize,
     tail_ptr: *usize,
-) ReaderType.Error!usize {
+) !usize {
     var tail = tail_ptr.*;
     const head = head_ptr.*;
     defer {
@@ -394,37 +392,44 @@ fn ringReadFrom(
 
     if (head == tail) {
         head_ptr.* = 0;
-        tail = try reader.read(buffer);
+        tail = try readFn(context, buffer);
         return tail;
     }
 
     if (tail > head) {
-        var n = try reader.read(buffer[tail..]);
+        var n = try readFn(context, buffer[tail..]);
         tail += n;
         if (tail == buffer.len and head > 1) {
-            tail = try reader.read(buffer[0 .. head - 1]);
+            tail = try readFn(context, buffer[0 .. head - 1]);
             n += tail;
         }
         return n;
     }
 
-    const n = try reader.read(buffer[tail .. head - 1]);
+    const n = try readFn(context, buffer[tail .. head - 1]);
     tail += n;
     return n;
 }
 
 test "test readFrom" {
-    var data = StringReader.init("0123456789").reader();
+    var sr = StringReader.init("0123456789");
     var ring_buffer = RingBuffer(8).init();
 
     {
-        const n = try ring_buffer.readFrom(StringReader.Reader, data);
+        const n = try ring_buffer.readFrom(*StringReader, &sr, StringReader.read);
         try testing.expect(n == 8);
         try testing.expectEqualSlices(u8, "01234567", &ring_buffer.buffer);
     }
 }
 
-fn ringWriteTo(comptime WriterType: type, writer: WriterType, buffer: []const u8, head_ptr: *usize, tail: usize) WriterType.Error!usize {
+fn ringWriteTo(
+    comptime Context: type,
+    context: Context,
+    writeFn: fn (context: Context, buffer: []const u8) anyerror!usize,
+    buffer: []const u8,
+    head_ptr: *usize,
+    tail: usize,
+) !usize {
     var head = head_ptr.*;
     if (tail == head) {
         return 0;
@@ -435,27 +440,27 @@ fn ringWriteTo(comptime WriterType: type, writer: WriterType, buffer: []const u8
     }
 
     if (tail > head) {
-        const n = try writer.write(buffer[head..tail]);
+        const n = try writeFn(context, buffer[head..tail]);
         head += n;
         return n;
     }
 
-    const n = try writer.write(buffer[head..]);
+    const n = try writeFn(context, buffer[head..]);
     head += n;
     if (head < buffer.len) { // did not write till the end
         return n;
     }
 
-    const m = try writer.write(buffer[0..tail]);
+    const m = try writeFn(context, buffer[0..tail]);
     head = m;
     return n + m;
 }
 
 test "test writeTo" {
     // populate
-    var data = StringReader.init("0123456789").reader();
+    var sr = StringReader.init("0123456789");
     var ring_buffer = RingBuffer(10).init();
-    _ = try ring_buffer.readFrom(StringReader.Reader, data);
+    _ = try ring_buffer.readFrom(*StringReader, &sr, StringReader.read);
 
     var buffer: [10]u8 = undefined;
     const fbs_t = std.io.FixedBufferStream([]u8);
@@ -465,7 +470,7 @@ test "test writeTo" {
     };
 
     {
-        const n = try ring_buffer.writeTo(fbs_t.Writer, fbs.writer());
+        const n = try ring_buffer.writeTo(*fbs_t, &fbs, fbs_t.write);
         try testing.expectEqualSlices(u8, "0123456789", &buffer);
         try testing.expect(n == 10);
     }
@@ -473,9 +478,9 @@ test "test writeTo" {
 
 test "test writeTo - 2" {
     // populate
-    var data = StringReader.init("abcdefghij").reader();
+    var sr = StringReader.init("abcdefghij");
     var ring_buffer = RingBuffer(10).init();
-    _ = try ring_buffer.readFrom(StringReader.Reader, data);
+    _ = try ring_buffer.readFrom(*StringReader, &sr, StringReader.read);
     ring_buffer.head = 7;
     ring_buffer.tail = 2;
 
@@ -487,7 +492,7 @@ test "test writeTo - 2" {
     };
 
     {
-        const n = try ring_buffer.writeTo(fbs_t.Writer, fbs.writer());
+        const n = try ring_buffer.writeTo(*fbs_t, &fbs, fbs_t.write);
         try testing.expect(n == 5);
         try testing.expectEqualSlices(u8, "hijab", buffer[0..n]);
     }

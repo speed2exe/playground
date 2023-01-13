@@ -1,17 +1,18 @@
 const std = @import("std");
 
 /// Writer is of type: std.io.Writer
-pub fn EscapeSequenceWriter(comptime WriterType: type) type {
+pub fn EscapeSequenceWriter(
+    comptime Context: type,
+    comptime writeFn: fn (Context, []const u8) anyerror!usize,
+) type {
     return struct {
         const Self = @This();
-        pub const Writer = WriterType.Writer;
+        const Writer = std.io.Writer(Context, anyerror, writeFn);
 
         writer: Writer,
 
-        pub fn init(w: *WriterType) Self {
-            return .{
-                .writer = .{ .context = w },
-            };
+        pub fn init(context: Context) Self {
+            return .{ .writer = .{ .context = context } };
         }
 
         pub fn cursorMoveHorizontal(self: *Self, left: usize, right: usize) !void {

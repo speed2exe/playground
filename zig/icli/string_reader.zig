@@ -4,8 +4,6 @@ const testing = std.testing;
 pub const StringReader = struct {
     data: []const u8,
 
-    pub const Reader = std.io.Reader(*StringReader, anyerror, read);
-
     pub fn init(data: []const u8) StringReader {
         return StringReader{
             .data = data,
@@ -21,15 +19,12 @@ pub const StringReader = struct {
         self.data = self.data[max_copyable..];
         return max_copyable;
     }
-
-    pub fn reader(self: *StringReader) Reader {
-        return Reader{ .context = self };
-    }
 };
 
 test "StringReader" {
     var buffer: [2]u8 = undefined;
-    var reader = StringReader.init("abcde").reader();
+    var sr = StringReader.init("abcde");
+    var reader = std.io.Reader(*StringReader, anyerror, StringReader.read){ .context = &sr };
 
     {
         const n = try reader.read(&buffer);

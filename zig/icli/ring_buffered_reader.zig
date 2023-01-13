@@ -1,36 +1,31 @@
 const std = @import("std");
 const testing = std.testing;
-const string_reader = @import("./string_reader.zig");
+const StringReader = @import("./string_reader.zig").StringReader;
 const ring_buffer = @import("./ring_buffer.zig");
 
 const USIZE_ZERO = @as(usize, 0);
 
 pub fn RingBufferedReader(
-    comptime ReaderType: type,
+    comptime Context: type,
+    comptime readFn: fn (context: Context, buffer: []u8) anyerror!usize,
     comptime buffer_size: comptime_int,
 ) type {
     return struct {
         const Self = @This();
-        pub const Error = ReaderType.Error;
-        pub const Reader = std.io.Reader(*Self, Error, read);
         pub const RingBuffer = ring_buffer.RingBuffer(buffer_size);
 
-        src: ReaderType,
+        context: Context,
         buffer: RingBuffer = .{},
 
-        pub fn init(r: ReaderType) Self {
-            return Self{ .src = r };
+        pub fn init(context: Context) Self {
+            return Self{ .context = context };
         }
 
-        pub fn read(self: *Self, dest: []u8) Error!usize {
+        pub fn read(self: *Self, dest: []u8) !usize {
             if (!(try self.ensureDataInBuffer())) {
                 return USIZE_ZERO;
             }
             return self.buffer.read(dest);
-        }
-
-        pub fn reader(self: *Self) Reader {
-            return Reader{ .context = self };
         }
 
         pub fn readConst(self: *Self) ![]const u8 {
@@ -42,7 +37,7 @@ pub fn RingBufferedReader(
 
         fn ensureDataInBuffer(self: *Self) !bool {
             if (self.buffer.isEmpty()) {
-                const n = try self.buffer.readFrom(ReaderType, self.src);
+                const n = try self.buffer.readFrom(Context, self.context, readFn);
                 return n > 0;
             }
             return true;
@@ -51,8 +46,8 @@ pub fn RingBufferedReader(
 }
 
 test "RingBufferedReader" {
-    var sr = string_reader.StringReader.init("123456789");
-    var buffered_reader = RingBufferedReader(string_reader.StringReader.Reader, 4).init(sr.reader());
+    var sr = StringReader.init("123456789");
+    var buffered_reader = RingBufferedReader(*StringReader, StringReader.read, 4).init(&sr);
 
     {
         var dest: [6]u8 = undefined;
