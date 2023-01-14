@@ -19,7 +19,6 @@ pub fn main() void {
 fn runApp(allocator: std.mem.Allocator) !void {
     const settings = icli.Settings{
         .log_file_path = "app.log",
-        .execute = execute,
         .suggest = suggest,
     };
 
@@ -27,16 +26,15 @@ fn runApp(allocator: std.mem.Allocator) !void {
     var cli = try cli_type.init(allocator);
     defer cli.deinit();
 
-    try cli.run();
+    try cli.run(void, {}, execute);
 
     // need to pass in option
 
     // need to pass in function for completion
 }
 
-fn execute(cmd: []const u8) bool {
-    std.debug.print("\nexecuting command: {s}\n", .{cmd});
-    // _ = cmd;
+fn execute(_: void, cmd: []const u8) bool {
+    std.debug.print("executing command: {s}\n", .{cmd});
 
     // continue
     return false;

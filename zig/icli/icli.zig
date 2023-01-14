@@ -37,18 +37,15 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             .{ escape_sequence.cursor_left, Self.keybindLeft },
         });
 
-        // Prompt (the thing before user input, e.g. "> ")
-        prompt: []const u8 = settings.prompt, // TODO: use enum to allow for different prompts (e.g. dynamic prompt)
-
-        // Execution
-        execute: *const fn ([]const u8) bool = settings.execute, // TODO: reconsider signature
+        // the thing before user input, e.g. "> "
+        prefix: []const u8 = settings.prefix, // TODO: use enum to allow for different prompts (e.g. dynamic prompt)
 
         // variables that are pretty much unchanged once initialized
         original_termios: std.os.termios,
         raw_mode_termios: std.os.termios,
         allocator: std.mem.Allocator,
         tty: File,
-        isEndOfUserInput: *const fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = settings.isEndOfUserInput,
+        is_end_of_user_input: *const fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = settings.is_end_of_user_input,
 
         /// io buffered readers/writers
         input: RingBufferedReader,
@@ -59,7 +56,6 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         /// history handling
         /// (when user presses up or down to select previously executed commands)
         history: History = History{},
-        history_size: usize = settings.history_size,
         history_selected: ?*History.Node = null, // current history node that user is using
         backup_buffer: array_list.Array(u8),
 
@@ -147,21 +143,26 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             self.done_pre_run_setup = true;
         }
 
-        pub fn run(self: *Self) !void {
+        pub fn run(
+            self: *Self,
+            comptime Context: type,
+            context: Context,
+            execute: *const fn (context: Context, user_input: []const u8) bool,
+        ) !void {
             preRun(self);
 
             while (true) {
                 try self.readUserInput();
-                if (self.execute(self.pre_cursor_buffer.getAll())) {
+                self.postReadUserInput();
+                if (execute(context, self.pre_cursor_buffer.getAll())) {
                     return;
                 }
-                self.postExecution();
             }
         }
 
-        fn postExecution(self: *Self) void {
+        fn postReadUserInput(self: *Self) void {
             // Update the history
-            if (self.history_size == 0) {
+            if (settings.history_size == 0) {
                 return;
             }
 
@@ -177,7 +178,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 }
             }
 
-            if (self.history.length < self.history_size) {
+            if (self.history.length < settings.history_size) {
                 _ = self.history.insertHead(self.pre_cursor_buffer);
                 self.pre_cursor_buffer = array_list.Array(u8).init(self.allocator);
                 return;
@@ -192,14 +193,14 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             self.pre_cursor_buffer = node_buffer;
         }
 
-        inline fn printPrompt(self: *Self) !void {
+        inline fn printPrefix(self: *Self) !void {
             // TODO: might add dynamic prompt later
-            try self.print("{s}", .{self.prompt});
+            try self.print("{s}", .{self.prefix});
         }
 
         /// Read user input and store it in self.input_buffer
         fn readUserInput(self: *Self) !void {
-            try self.printPrompt();
+            try self.printPrefix();
             try self.flush();
 
             try self.log_to_file("readUserInput: waiting...\n", .{});
@@ -208,6 +209,8 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             defer self.setOriginalInputMode() catch |err| {
                 self.log_to_file("Failed to set original input mode: {any}", .{err}) catch unreachable;
             };
+
+            defer self.printNewLineAfterUserInput() catch unreachable;
             defer self.clearSuggestions() catch unreachable;
 
             self.pre_cursor_buffer.truncate(0);
@@ -227,7 +230,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                     continue;
                 }
 
-                if (self.isEndOfUserInput(input, self.pre_cursor_buffer.getAll(), self.validPostCursorBuffer())) {
+                if (self.is_end_of_user_input(input, self.pre_cursor_buffer.getAll(), self.validPostCursorBuffer())) {
                     try self.pre_cursor_buffer.appendSlice(self.validPostCursorBuffer());
                     return;
                 }
@@ -413,7 +416,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         fn reDraw(self: *Self) !void {
             try self.print("\r", .{}); // move cursor to the beginning of the line
             try self.escape_sequence_writer.eraseFromCursorToEnd();
-            try self.printPrompt();
+            try self.printPrefix();
             try self.printCurrentInput();
         }
 
@@ -471,6 +474,13 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             try self.log_var_to_file(self.validPreCursorBuffer(), "validPreCursorBuffer");
             try self.log_var_to_file(self.validPostCursorBuffer(), "validPostCursorBuffer");
         }
+
+        inline fn printNewLineAfterUserInput(self: *Self) !void {
+            if (settings.print_newline_after_user_input) {
+                try self.print("\r\n", .{});
+                try self.flush();
+            }
+        }
     };
 }
 
@@ -478,11 +488,11 @@ pub const Settings = struct {
     input_buffer_size: usize = 4096,
     history_size: usize = 100,
     log_file_path: ?[]const u8 = null,
-    isEndOfUserInput: fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = defaults.isEndOfUserInput,
+    is_end_of_user_input: fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = defaults.isEndOfUserInput,
+    print_newline_after_user_input: bool = true,
     preSuggestionLeftOffset: fn (input_pre_cursor: []const u8) usize = defaults.preSuggestionLeftOffset,
 
-    execute: *const fn ([]const u8) bool,
-    prompt: []const u8 = "> ",
+    prefix: []const u8 = "> ",
 
     max_suggestion_count: usize = 3,
     suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) anyerror![]Suggestion = null,
@@ -501,10 +511,6 @@ fn maxSuggestionTextLen(suggestions: []Suggestion) usize {
         }
     }
     return max_len;
-}
-
-fn isEnd(byte: u8) bool {
-    return byte == '\r';
 }
 
 // TODO: add context for suggestio, since there's no closure
