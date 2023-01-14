@@ -65,7 +65,7 @@ pub fn Array(comptime T: type) type {
             self.len -= 1;
         }
 
-        pub fn getAll(self: *Self) []T {
+        pub fn getAll(self: Self) []T {
             return self.elems[0..self.len];
         }
 
@@ -88,6 +88,23 @@ pub fn Array(comptime T: type) type {
         // TODO: Test append after truncate
         pub fn truncate(self: *Self, n: usize) void {
             self.len = n;
+        }
+
+        pub fn filter(
+            self: *Self,
+            comptime Context: type,
+            context: Context,
+            predicate: fn (context: Context, elem: T) bool,
+        ) void {
+            var insert_index: usize = 0;
+            var i: usize = 0;
+            while (i < self.len) : (i += 1) {
+                if (predicate(context, self.elems[i])) {
+                    self.elems[insert_index] = self.elems[i];
+                    insert_index += 1;
+                }
+            }
+            self.truncate(insert_index);
         }
 
         fn ensureCapacity(self: *Self, cap: usize) !void {
@@ -153,6 +170,16 @@ test "Array" {
         try array.appendSlice(&slice);
         try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{ 6, 1, 2, 3, 5, 6, 7, 8, 9, 10 });
     }
+
+    {
+        // filter
+        array.filter(void, {}, greaterThan5);
+        try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{ 6, 6, 7, 8, 9, 10 });
+    }
+}
+
+fn greaterThan5(_: void, x: i8) bool {
+    return x > 5;
 }
 
 fn i8Less(a: i8, b: i8) bool {

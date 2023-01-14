@@ -8,6 +8,10 @@ const defaults = @import("./defaults.zig");
 const tree_print = @import("./tree_print.zig");
 const escape_sequence = @import("./escape_sequence.zig");
 const escape_sequence_writer = @import("./escape_sequence_writer.zig");
+const maxSuggestionTextLen = @import("./suggestion.zig").maxSuggestionTextLen;
+pub const Suggestion = @import("./suggestion.zig").Suggestion;
+pub const Settings = @import("./settings.zig").Settings;
+pub const UserInput = @import("./user_input.zig").UserInput;
 const File = std.fs.File;
 const OpenMode = std.fs.File.OpenMode;
 const termios = switch (builtin.os.tag) {
@@ -24,6 +28,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         const RingBufferedWriterStd = std.io.Writer(*RingBufferedWriter, anyerror, RingBufferedWriter.write);
         const History = fdll.FixedDoublyLinkedList(array_list.Array(u8), settings.history_size);
         const EscapeSequenceWriter = escape_sequence_writer.EscapeSequenceWriter(*RingBufferedWriter, RingBufferedWriter.write);
+        const SuggestionList = array_list.Array(Suggestion);
 
         // Keybindings set up at comptime
         // TODO: allow user to include their own custom keybind(with a context)
@@ -45,7 +50,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         raw_mode_termios: std.os.termios,
         allocator: std.mem.Allocator,
         tty: File,
-        is_end_of_user_input: *const fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = settings.is_end_of_user_input,
+        is_end_of_user_input: *const fn (keypress: []const u8, user_input: UserInput) bool = settings.is_end_of_user_input,
 
         /// io buffered readers/writers
         input: RingBufferedReader,
@@ -76,8 +81,8 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         post_cursor_position: usize = 0,
 
         /// suggestion handling
-        suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) anyerror![]Suggestion = settings.suggest,
-        preSuggestionLeftOffset: *const fn (input_pre_cursor: []const u8) usize = settings.preSuggestionLeftOffset,
+        /// TODO: add context
+        suggestion_list: SuggestionList,
         current_suggestions: []Suggestion = undefined,
         selected_suggestion: ?*Suggestion = null,
 
@@ -114,6 +119,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 .allocator = allocator,
                 .pre_cursor_buffer = array_list.Array(u8).init(allocator),
                 .backup_buffer = array_list.Array(u8).init(allocator),
+                .suggestion_list = SuggestionList.init(allocator),
                 .post_cursor_buffer = &[_]u8{},
                 .log_file = log_file,
             };
@@ -122,6 +128,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         pub fn deinit(self: *Self) void {
             self.pre_cursor_buffer.deinit();
             self.backup_buffer.deinit();
+            self.suggestion_list.deinit();
 
             self.allocator.free(self.post_cursor_buffer);
 
@@ -224,7 +231,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                     continue;
                 }
 
-                if (self.is_end_of_user_input(input, self.pre_cursor_buffer.getAll(), self.validPostCursorBuffer())) {
+                if (self.is_end_of_user_input(input, self.getUserInput())) {
                     try self.pre_cursor_buffer.appendSlice(self.validPostCursorBuffer());
                     return;
                 }
@@ -252,8 +259,18 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         }
 
         fn computeSuggestions(self: *Self) !void {
-            const suggest = self.suggest orelse return;
-            self.current_suggestions = try suggest(self.validPreCursorBuffer(), self.validPostCursorBuffer());
+            defer self.current_suggestions = self.suggestion_list.getAll();
+
+            const suggestFn = settings.suggestFn orelse return;
+            self.suggestion_list.truncate(0);
+            try self.suggestion_list.appendSlice(suggestFn(self.validPreCursorBuffer(), self.validPostCursorBuffer()));
+            if (settings.suggestFilterPredicate) |predicateFn| {
+                self.suggestion_list.filter(
+                    UserInput,
+                    self.getUserInput(),
+                    predicateFn.*,
+                );
+            }
         }
 
         // TODO: teardown after app ends
@@ -263,7 +280,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             }
 
             const max_text_len = maxSuggestionTextLen(self.current_suggestions);
-            const pre_suggestion_left_offset = self.preSuggestionLeftOffset(self.validPreCursorBuffer());
+            const pre_suggestion_left_offset = settings.preSuggestionLeftOffset(self.validPreCursorBuffer());
 
             var suggestion_count: usize = 0;
             for (self.current_suggestions) |suggestion| {
@@ -279,9 +296,6 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 try self.output_std.print("||{s}", .{description});
                 try self.escape_sequence_writer.cursorMoveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
             }
-
-            try self.log_var_to_file(suggestion_count, "suggestion_count");
-
             try self.escape_sequence_writer.cursorMoveUp(suggestion_count);
         }
 
@@ -445,11 +459,11 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             _ = try self.output.flush();
         }
 
-        inline fn validPreCursorBuffer(self: *Self) []const u8 {
+        inline fn validPreCursorBuffer(self: Self) []const u8 {
             return self.pre_cursor_buffer.getAll();
         }
 
-        inline fn validPostCursorBuffer(self: *Self) []const u8 {
+        inline fn validPostCursorBuffer(self: Self) []const u8 {
             return self.post_cursor_buffer[self.post_cursor_position..];
         }
 
@@ -459,6 +473,10 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
         inline fn invalidatePostCursorBuffer(self: *Self) void {
             self.post_cursor_position = self.post_cursor_buffer.len;
+        }
+
+        inline fn getUserInput(self: Self) UserInput {
+            return UserInput.init(self.pre_cursor_buffer.getAll(), self.validPostCursorBuffer());
         }
 
         inline fn log_to_file(self: *Self, comptime fmt: []const u8, args: anytype) !void {
@@ -486,35 +504,6 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             }
         }
     };
-}
-
-pub const Settings = struct {
-    input_buffer_size: usize = 4096,
-    history_size: usize = 100,
-    log_file_path: ?[]const u8 = null,
-    is_end_of_user_input: fn (keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool = defaults.isEndOfUserInput,
-    print_newline_after_user_input: bool = true,
-    preSuggestionLeftOffset: fn (input_pre_cursor: []const u8) usize = defaults.preSuggestionLeftOffset,
-
-    prefix: []const u8 = "> ",
-
-    max_suggestion_count: usize = 2,
-    suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) anyerror![]Suggestion = null,
-};
-
-pub const Suggestion = struct {
-    text: []const u8 = "",
-    description: ?[]const u8 = null,
-};
-
-fn maxSuggestionTextLen(suggestions: []Suggestion) usize {
-    var max_len: usize = 0;
-    for (suggestions) |suggestion| {
-        if (suggestion.text.len > max_len) {
-            max_len = suggestion.text.len;
-        }
-    }
-    return max_len;
 }
 
 // TODO: add context for suggestio, since there's no closure

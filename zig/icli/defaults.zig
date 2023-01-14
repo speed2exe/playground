@@ -1,8 +1,9 @@
 const std = @import("std");
+const Suggestion = @import("./suggestion.zig").Suggestion;
+const UserInput = @import("./user_input.zig").UserInput;
 
-pub fn isEndOfUserInput(keypress: []const u8, input_pre_cursor: []const u8, input_post_cursor: []const u8) bool {
-    _ = input_pre_cursor;
-    _ = input_post_cursor;
+pub fn isEndOfUserInput(keypress: []const u8, user_input: UserInput) bool {
+    _ = user_input;
 
     // TODO: tested only in linux
     // modify for other platforms
@@ -22,4 +23,21 @@ pub fn preSuggestionLeftOffset(input_pre_cursor: []const u8) usize {
     }
 
     return result;
+}
+
+pub fn suggestFilterPredicate(
+    user_input: UserInput,
+    suggestion: Suggestion,
+) bool {
+    return std.mem.startsWith(u8, suggestion.text, user_input.pre_cursor);
+}
+
+pub fn suggestSortCompare(s1: Suggestion, s2: Suggestion) std.math.Order {
+    if (s1.text.len > s2.text.len) {
+        return std.math.Order.gt;
+    }
+    if (s1.text.len < s2.text.len) {
+        return std.math.Order.lt;
+    }
+    return std.mem.order(u8, s1.text, s2.text);
 }
