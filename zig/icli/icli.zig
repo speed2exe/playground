@@ -265,11 +265,10 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             self.suggestion_list.truncate(0);
             try self.suggestion_list.appendSlice(suggestFn(self.validPreCursorBuffer(), self.validPostCursorBuffer()));
             if (settings.suggestFilterPredicate) |predicateFn| {
-                self.suggestion_list.filter(
-                    UserInput,
-                    self.getUserInput(),
-                    predicateFn.*,
-                );
+                self.suggestion_list.filter(UserInput, self.getUserInput(), predicateFn.*);
+            }
+            if (settings.suggestSortCompare) |sortCompare| {
+                self.suggestion_list.sort(void, {}, sortCompare.*); // TODO: allow user to pass in context
             }
         }
 

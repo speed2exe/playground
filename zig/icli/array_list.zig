@@ -107,6 +107,17 @@ pub fn Array(comptime T: type) type {
             self.truncate(insert_index);
         }
 
+        pub fn sort(
+            self: *Self,
+            comptime Context: type,
+            context: Context,
+            // context: anytype,
+            // comptime lessThan: fn (context: @TypeOf(context), lhs: T, rhs: T) bool,
+            comptime lessThan: fn (context: Context, lhs: T, rhs: T) bool,
+        ) void {
+            std.sort.sort(T, self.getAll(), context, lessThan);
+        }
+
         fn ensureCapacity(self: *Self, cap: usize) !void {
             if (self.elems.len >= cap) {
                 return;
@@ -176,10 +187,20 @@ test "Array" {
         array.filter(void, {}, greaterThan5);
         try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{ 6, 6, 7, 8, 9, 10 });
     }
+
+    {
+        // sort
+        array.sort({}, greaterThan);
+        try testing.expectEqualSlices(i8, array.getAll(), &[_]i8{ 10, 9, 8, 7, 6, 6 });
+    }
 }
 
 fn greaterThan5(_: void, x: i8) bool {
     return x > 5;
+}
+
+fn greaterThan(_: void, lhs: i8, rhs: i8) bool {
+    return lhs > rhs;
 }
 
 fn i8Less(a: i8, b: i8) bool {

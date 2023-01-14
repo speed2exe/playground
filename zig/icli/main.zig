@@ -48,9 +48,11 @@ fn execute(_: void, cmd: []const u8) bool {
 //
 
 var s = [_]icli.Suggestion{
+    .{ .text = "bob", .description = "bob description" },
     .{ .text = "foo", .description = "foo description" },
-    .{ .text = "bar", .description = "bar description" },
+    .{ .text = "ba", .description = "ba description" },
     .{ .text = "baz", .description = "baz description" },
+    .{ .text = "bar", .description = "bar description" },
     .{ .text = "hello", .description = "hello description" },
     .{ .text = "world", .description = "world description" },
 };

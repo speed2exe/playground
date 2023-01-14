@@ -24,3 +24,12 @@ pub fn main() !void {
 pub fn comptimePrint(comptime n: comptime_int) []const u8 {
     return std.fmt.comptimePrint("dd{d}bb", .{n});
 }
+
+fn lessThan(a: u8, b: u8) bool {
+    return a < b;
+}
+
+fn lessThanWithContext(Context: type, context: Context, a: u8, b: u8) bool {
+    _ = context;
+    lessThan(a, b);
+}

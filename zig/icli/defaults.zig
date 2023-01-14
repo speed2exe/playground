@@ -32,12 +32,12 @@ pub fn suggestFilterPredicate(
     return std.mem.startsWith(u8, suggestion.text, user_input.pre_cursor);
 }
 
-pub fn suggestSortCompare(s1: Suggestion, s2: Suggestion) std.math.Order {
-    if (s1.text.len > s2.text.len) {
-        return std.math.Order.gt;
-    }
+pub fn suggestSortCompare(_: void, s1: Suggestion, s2: Suggestion) bool {
     if (s1.text.len < s2.text.len) {
-        return std.math.Order.lt;
+        return true;
     }
-    return std.mem.order(u8, s1.text, s2.text);
+    if (s1.text.len > s2.text.len) {
+        return false;
+    }
+    return std.mem.order(u8, s1.text, s2.text) == .lt;
 }
