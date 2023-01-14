@@ -76,11 +76,10 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         post_cursor_position: usize = 0,
 
         /// suggestion handling
-        max_suggestion_count: usize = settings.max_suggestion_count,
         suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) anyerror![]Suggestion = settings.suggest,
         preSuggestionLeftOffset: *const fn (input_pre_cursor: []const u8) usize = settings.preSuggestionLeftOffset,
         current_suggestions: []Suggestion = undefined,
-        displayed_suggestions: [settings.max_suggestion_count]Suggestion = [_]Suggestion{Suggestion{}} ** settings.max_suggestion_count,
+        selected_suggestion: ?*Suggestion = null,
 
         /// file that collects all logs
         log_file: ?File,
@@ -193,11 +192,6 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             self.pre_cursor_buffer = node_buffer;
         }
 
-        inline fn printPrefix(self: *Self) !void {
-            // TODO: might add dynamic prompt later
-            try self.print("{s}", .{self.prefix});
-        }
-
         /// Read user input and store it in self.input_buffer
         fn readUserInput(self: *Self) !void {
             try self.printPrefix();
@@ -247,7 +241,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         fn clearSuggestions(self: *Self) !void {
             const sequences: []const u8 = blk: {
                 comptime {
-                    const lines_to_clear = self.displayed_suggestions.len;
+                    const lines_to_clear = settings.max_suggestion_count;
                     const clear_lines_down = (escape_sequence.cursor_down ++ escape_sequence.clear_entire_line) ** lines_to_clear;
                     const move_ups = escape_sequence.cursorUp(lines_to_clear);
                     break :blk clear_lines_down ++ move_ups;
@@ -268,11 +262,14 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 return;
             }
 
-            // TODO: incorporate max_suggestions count
             const max_text_len = maxSuggestionTextLen(self.current_suggestions);
             const pre_suggestion_left_offset = self.preSuggestionLeftOffset(self.validPreCursorBuffer());
 
+            var suggestion_count: usize = 0;
             for (self.current_suggestions) |suggestion| {
+                if (suggestion_count >= settings.max_suggestion_count) break;
+                defer suggestion_count += 1;
+
                 try self.escape_sequence_writer.cursorMoveLeft(pre_suggestion_left_offset);
                 try self.print("\n", .{});
                 try self.escape_sequence_writer.eraseEntireLine();
@@ -283,7 +280,9 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 try self.escape_sequence_writer.cursorMoveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
             }
 
-            try self.escape_sequence_writer.cursorMoveUp(self.current_suggestions.len);
+            try self.log_var_to_file(suggestion_count, "suggestion_count");
+
+            try self.escape_sequence_writer.cursorMoveUp(suggestion_count);
         }
 
         fn prependPostCursorBuffer(self: *Self, bytes: []const u8) !void {
@@ -420,6 +419,11 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             try self.printCurrentInput();
         }
 
+        inline fn printPrefix(self: *Self) !void {
+            // TODO: might add dynamic prompt later
+            try self.print("{s}", .{self.prefix});
+        }
+
         inline fn printCurrentInput(self: *Self) !void {
             try self.print("{s}", .{self.validPreCursorBuffer()});
             try self.print("{s}", .{self.validPostCursorBuffer()});
@@ -494,7 +498,7 @@ pub const Settings = struct {
 
     prefix: []const u8 = "> ",
 
-    max_suggestion_count: usize = 3,
+    max_suggestion_count: usize = 2,
     suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) anyerror![]Suggestion = null,
 };
 
