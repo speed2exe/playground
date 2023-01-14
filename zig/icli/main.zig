@@ -35,7 +35,8 @@ fn runApp(allocator: std.mem.Allocator) !void {
 }
 
 fn execute(cmd: []const u8) bool {
-    std.debug.print("executing command: {s}\n", .{cmd});
+    std.debug.print("\nexecuting command: {s}\n", .{cmd});
+    // _ = cmd;
 
     // continue
     return false;

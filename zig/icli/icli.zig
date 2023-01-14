@@ -31,10 +31,10 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             .{ escape_sequence.ctrl_c, Self.keybindCtrlC },
             .{ escape_sequence.ctrl_d, Self.keybindCtrlD },
             .{ escape_sequence.backspace, Self.keybindBackspace },
-            .{ escape_sequence.up, Self.keybindUp },
-            .{ escape_sequence.down, Self.keybindDown },
-            .{ escape_sequence.right, Self.keybindRight },
-            .{ escape_sequence.left, Self.keybindLeft },
+            .{ escape_sequence.cursor_up, Self.keybindUp },
+            .{ escape_sequence.cursor_down, Self.keybindDown },
+            .{ escape_sequence.cursor_right, Self.keybindRight },
+            .{ escape_sequence.cursor_left, Self.keybindLeft },
         });
 
         // Prompt (the thing before user input, e.g. "> ")
@@ -229,7 +229,6 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
                 if (self.isEndOfUserInput(input, self.pre_cursor_buffer.getAll(), self.validPostCursorBuffer())) {
                     try self.pre_cursor_buffer.appendSlice(self.validPostCursorBuffer());
-                    _ = try self.output.write("\r\n");
                     return;
                 }
 
@@ -238,21 +237,21 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 _ = try self.writePostCursorBuffer();
 
                 try self.computeSuggestions();
-
                 _ = try self.printSuggestions();
-                // TODO: generate autocompletion after flush?
             }
         }
 
         fn clearSuggestions(self: *Self) !void {
             const sequences: []const u8 = blk: {
                 comptime {
-                    const clear_lines_down = ("\n" ++ escape_sequence.clear_entire_line) ** (self.displayed_suggestions.len);
-                    const move_ups = escape_sequence.move_up_once ** self.displayed_suggestions.len;
-                    break :blk move_ups ++ clear_lines_down;
+                    const lines_to_clear = self.displayed_suggestions.len;
+                    const clear_lines_down = (escape_sequence.cursor_down ++ escape_sequence.clear_entire_line) ** lines_to_clear;
+                    const move_ups = escape_sequence.cursorUp(lines_to_clear);
+                    break :blk clear_lines_down ++ move_ups;
                 }
             };
             try self.print(sequences, .{});
+            try self.flush();
         }
 
         fn computeSuggestions(self: *Self) !void {
@@ -485,7 +484,7 @@ pub const Settings = struct {
     execute: *const fn ([]const u8) bool,
     prompt: []const u8 = "> ",
 
-    max_suggestion_count: usize = 5,
+    max_suggestion_count: usize = 3,
     suggest: ?*const fn (pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) anyerror![]Suggestion = null,
 };
 

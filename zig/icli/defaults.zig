@@ -9,7 +9,7 @@ pub fn isEndOfUserInput(keypress: []const u8, input_pre_cursor: []const u8, inpu
     return std.mem.eql(u8, keypress, "\r");
 }
 
-// number of steps to move left before pring the suggestion
+// number of steps to move left before printing suggestion
 pub fn preSuggestionLeftOffset(input_pre_cursor: []const u8) usize {
     var result: usize = 0;
 
