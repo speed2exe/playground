@@ -51,6 +51,8 @@ var s = [_]icli.Suggestion{
     .{ .text = "foo", .description = "foo description" },
     .{ .text = "bar", .description = "bar description" },
     .{ .text = "baz", .description = "baz description" },
+    .{ .text = "hello", .description = "hello description" },
+    .{ .text = "world", .description = "world description" },
 };
 
 fn suggest(pre_cursor_buffer: []const u8, post_cursor_buffer: []const u8) []icli.Suggestion {

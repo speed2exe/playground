@@ -211,6 +211,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 self.log_to_file("Failed to set original input mode: {any}", .{err}) catch unreachable;
             };
 
+            defer self.flush() catch unreachable;
             defer self.printNewLineAfterUserInput() catch unreachable;
             defer self.clearSuggestions() catch unreachable;
 
@@ -255,7 +256,6 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 }
             };
             try self.print(sequences, .{});
-            try self.flush();
         }
 
         fn computeSuggestions(self: *Self) !void {
@@ -276,6 +276,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         // TODO: teardown after app ends
         fn printSuggestions(self: *Self) !void {
             if (self.current_suggestions.len == 0) {
+                try self.clearSuggestions();
                 return;
             }
 
@@ -296,7 +297,13 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 try self.output_std.print("||{s}", .{description});
                 try self.escape_sequence_writer.cursorMoveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
             }
-            try self.escape_sequence_writer.cursorMoveUp(suggestion_count);
+
+            while (suggestion_count < settings.max_suggestion_count) : (suggestion_count += 1) {
+                try self.print("\n", .{});
+                try self.escape_sequence_writer.eraseEntireLine();
+            }
+
+            try self.escape_sequence_writer.cursorMoveUp(settings.max_suggestion_count);
         }
 
         fn prependPostCursorBuffer(self: *Self, bytes: []const u8) !void {
@@ -365,6 +372,8 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 try self.print("{s}", .{self.validPostCursorBuffer()}); // print post cursor buffer
                 try self.escape_sequence_writer.cursorMoveLeft(self.validPostCursorBuffer().len);
             }
+            try self.computeSuggestions();
+            try self.printSuggestions();
         }
 
         fn keybindLeft(self: *Self) !void {
@@ -500,7 +509,6 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         inline fn printNewLineAfterUserInput(self: *Self) !void {
             if (settings.print_newline_after_user_input) {
                 try self.print("\r\n", .{});
-                try self.flush();
             }
         }
     };
