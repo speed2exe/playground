@@ -40,17 +40,14 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             .{ escape_sequence.cursor_down, Self.keybindDown },
             .{ escape_sequence.cursor_right, Self.keybindRight },
             .{ escape_sequence.cursor_left, Self.keybindLeft },
+            .{ escape_sequence.tab, Self.keybindTab },
         });
-
-        // the thing before user input, e.g. "> "
-        prefix: []const u8 = settings.prefix, // TODO: use enum to allow for different prompts (e.g. dynamic prompt)
 
         // variables that are pretty much unchanged once initialized
         original_termios: std.os.termios,
         raw_mode_termios: std.os.termios,
         allocator: std.mem.Allocator,
         tty: File,
-        is_end_of_user_input: *const fn (keypress: []const u8, user_input: UserInput) bool = settings.is_end_of_user_input,
 
         /// io buffered readers/writers
         input: RingBufferedReader,
@@ -84,7 +81,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         /// TODO: add context
         suggestion_list: SuggestionList,
         current_suggestions: []Suggestion = undefined,
-        selected_suggestion: ?*Suggestion = null,
+        selected_suggestion: ?usize = null,
 
         /// file that collects all logs
         log_file: ?File,
@@ -232,7 +229,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                     continue;
                 }
 
-                if (self.is_end_of_user_input(input, self.getUserInput())) {
+                if (settings.is_end_of_user_input(input, self.getUserInput())) {
                     try self.pre_cursor_buffer.appendSlice(self.validPostCursorBuffer());
                     return;
                 }
@@ -279,11 +276,46 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 return;
             }
 
-            const max_text_len = maxSuggestionTextLen(self.current_suggestions);
             const pre_suggestion_left_offset = settings.preSuggestionLeftOffset(self.validPreCursorBuffer());
+            const selected_suggestion_opt = self.selected_suggestion;
+            var window_selected_suggestion_opt: ?usize = selected_suggestion_opt;
 
+            const suggestion_window: []Suggestion = blk: {
+                // no suggestions selected
+                const selected_suggestion = selected_suggestion_opt orelse {
+                    break :blk self.current_suggestions;
+                };
+                // all computed suggestion is within the window size
+                if (self.current_suggestions.len <= settings.max_suggestion_count) {
+                    window_selected_suggestion_opt = selected_suggestion;
+                    break :blk self.current_suggestions;
+                }
+                // selected suggestion is within top most window
+                const mid = settings.max_suggestion_count / 2;
+                if (selected_suggestion <= mid) {
+                    window_selected_suggestion_opt = selected_suggestion;
+                    break :blk self.current_suggestions;
+                }
+                // selected suggestion is within bottom most window
+                if (selected_suggestion + mid >= self.current_suggestions.len) {
+                    const end = self.current_suggestions.len;
+                    const start = end - settings.max_suggestion_count;
+                    window_selected_suggestion_opt = selected_suggestion - start;
+                    break :blk self.current_suggestions[start..end];
+                }
+                // selected suggestion is somewhere in the middle
+                const end = selected_suggestion + mid;
+                const start = selected_suggestion - mid;
+                window_selected_suggestion_opt = selected_suggestion - start;
+                break :blk self.current_suggestions[start..end];
+            };
+
+            // try self.log_var_to_file(suggestion_window, "suggestion_window");
+            try self.log_var_to_file(window_selected_suggestion_opt, "window_selected_suggestion_opt");
+
+            const max_text_len = maxSuggestionTextLen(suggestion_window);
             var suggestion_count: usize = 0;
-            for (self.current_suggestions) |suggestion| {
+            for (suggestion_window) |suggestion| {
                 if (suggestion_count >= settings.max_suggestion_count) break;
                 defer suggestion_count += 1;
 
@@ -294,6 +326,15 @@ pub fn InteractiveCli(comptime settings: Settings) type {
                 try self.output_std.writeByteNTimes(' ', max_text_len - suggestion.text.len);
                 const description = suggestion.description orelse "";
                 try self.output_std.print("||{s}", .{description});
+
+                // TODO: make nicer selection
+                if (window_selected_suggestion_opt) |window_selected_suggestion| {
+                    if (suggestion_count == window_selected_suggestion) {
+                        try self.print(" *", .{});
+                        try self.escape_sequence_writer.cursorMoveLeft(2);
+                    }
+                }
+
                 try self.escape_sequence_writer.cursorMoveHorizontal(max_text_len + description.len + 2, pre_suggestion_left_offset);
             }
 
@@ -421,6 +462,21 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             try self.reDraw();
         }
 
+        fn keybindTab(self: *Self) !void {
+            try self.log_var_to_file(self.current_suggestions.len, "self.current_suggestions.len");
+
+            if (self.current_suggestions.len == 0) return;
+
+            self.selected_suggestion = blk: {
+                const current = self.selected_suggestion orelse break :blk 0;
+                const next = (current + 1) % self.current_suggestions.len;
+                if (next == 0) break :blk null;
+                break :blk next;
+            };
+
+            try self.printSuggestions();
+        }
+
         fn switchInputBuffer(self: *Self) void {
             const tmp = self.pre_cursor_buffer;
             self.pre_cursor_buffer = self.backup_buffer;
@@ -443,7 +499,7 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
         inline fn printPrefix(self: *Self) !void {
             // TODO: might add dynamic prompt later
-            try self.print("{s}", .{self.prefix});
+            try self.print("{s}", .{settings.prefix});
         }
 
         inline fn printCurrentInput(self: *Self) !void {
@@ -481,6 +537,10 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 
         inline fn invalidatePostCursorBuffer(self: *Self) void {
             self.post_cursor_position = self.post_cursor_buffer.len;
+        }
+
+        inline fn selectingSuggestion(self: Self) bool {
+            return self.selected_suggestion != null;
         }
 
         inline fn getUserInput(self: Self) UserInput {

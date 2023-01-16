@@ -4,6 +4,8 @@ pub const clear_entire_line = "\x1b[2K";
 
 pub const ctrl_c = &[_]u8{3};
 pub const ctrl_d = &[_]u8{4};
+pub const tab = &[_]u8{9};
+pub const shift_tab = &[_]u8{32};
 pub const backspace = &[_]u8{127};
 pub const cursor_up = "\x1b[A";
 pub const cursor_down = "\x1b[B";
