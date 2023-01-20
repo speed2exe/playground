@@ -463,8 +463,6 @@ pub fn InteractiveCli(comptime settings: Settings) type {
         }
 
         fn keybindTab(self: *Self) !void {
-            try self.log_var_to_file(self.current_suggestions.len, "self.current_suggestions.len");
-
             if (self.current_suggestions.len == 0) return;
 
             self.selected_suggestion = blk: {
@@ -560,11 +558,6 @@ pub fn InteractiveCli(comptime settings: Settings) type {
             }
         }
 
-        inline fn log_pre_and_post_cursor_buffer(self: *Self) !void {
-            try self.log_var_to_file(self.validPreCursorBuffer(), "validPreCursorBuffer");
-            try self.log_var_to_file(self.validPostCursorBuffer(), "validPostCursorBuffer");
-        }
-
         inline fn printNewLineAfterUserInput(self: *Self) !void {
             if (settings.print_newline_after_user_input) {
                 try self.print("\r\n", .{});
@@ -579,3 +572,5 @@ pub fn InteractiveCli(comptime settings: Settings) type {
 // TODO: clean up completion after quit (ctrl-D)
 // TODO: Issue: Still seeing suggestion after execute
 // TODO: print suggestion with color
+// TODO: use store and restore cursor api
+// TODO: option to show completion at the start

@@ -21,13 +21,11 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
     switch (type_info) {
         .Struct => |s| {
             try writer.print("{s} {s}", .{ id_colored, type_name_colored });
-            if (s.fields.len == 0) {
-                return;
-            }
+            if (s.fields.len == 0) return;
+
             const last_field_idx = s.fields.len - 1;
-            if (last_field_idx == -1) {
-                return;
-            }
+            if (last_field_idx == -1) return;
+
             const backup_len = prefix.items.len;
             {
                 inline for (s.fields[0..last_field_idx]) |field| {
