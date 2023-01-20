@@ -2,7 +2,11 @@ const std = @import("std");
 const builtin = std.builtin;
 const log = std.log;
 
-const arrow = "\x1b[90m" ++ "=>" ++ "\x1b[m";
+const ansi_esc_code = @import("./ansi_esc_code.zig");
+const Color = ansi_esc_code.Color;
+const comptimePrintInColor = ansi_esc_code.comptimePrintInColor;
+
+const arrow = comptimePrintInColor(Color.bright_black, "=>", .{});
 
 pub fn treePrint(allocator: std.mem.Allocator, writer: anytype, arg: anytype, comptime id: []const u8) !void {
     var prefix = std.ArrayList(u8).init(allocator);
@@ -15,8 +19,8 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
     const arg_type = @TypeOf(arg);
     const type_info = @typeInfo(arg_type);
     const type_name = @typeName(arg_type);
-    const type_name_colored = "\x1b[36m" ++ type_name ++ "\x1b[m"; // cyan colored
-    const id_colored = "\x1b[33m" ++ id ++ "\x1b[m"; // yellow colored
+    const type_name_colored = comptimePrintInColor(Color.cyan, type_name, .{});
+    const id_colored = comptimePrintInColor(Color.yellow, id, .{});
 
     switch (type_info) {
         .Struct => |s| {
@@ -56,22 +60,25 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
             {
                 const backup_len = prefix.items.len;
                 inline for (arg[0 .. arg.len - 1]) |item, i| {
-                    try writer.print("\n{s}├─\x1b[33m[{d}]\x1b[m", .{ prefix.items, i });
+                    const index_colored = comptimePrintInColor(Color.yellow, "[{d}]", .{i});
+                    try writer.print("\n{s}├─{s}", .{ prefix.items, index_colored });
                     try prefix.appendSlice("│ ");
                     try treePrintPrefix(prefix, writer, item, "");
                     prefix.shrinkRetainingCapacity(backup_len);
                 }
             }
             {
-                try writer.print("\n{s}└─\x1b[33m[{d}]\x1b[m", .{ prefix.items, arg.len - 1 });
+                const index_colored = comptimePrintInColor(Color.yellow, "[{d}]", .{arg.len - 1});
+                try writer.print("\n{s}└─{s}", .{ prefix.items,  index_colored });
                 try prefix.appendSlice("  ");
                 try treePrintPrefix(prefix, writer, arg[arg.len - 1], "");
             }
         },
         .Pointer => |p| {
+            const address_fmt = comptime comptimePrintInColor(Color.blue, "{{x}}", .{});
             switch (p.size) {
                 .One => {
-                    try writer.print("{s} {s} \x1b[34m@{x}\x1b[m", .{ id_colored, type_name_colored, @ptrToInt(arg) });
+                    try writer.print("{s} {s} " ++ address_fmt, .{ id_colored, type_name_colored, @ptrToInt(arg) });
                     if (p.child == anyopaque) {
                         return;
                     }
@@ -99,6 +106,8 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
                     }
                 },
                 .Slice => {
+                    const index_fmt = comptime comptimePrintInColor(Color.yellow, "[{{d}}]", .{});
+
                     try writer.print("{s} {s}", .{ id_colored, type_name_colored });
                     if (arg.len == 0) {
                         return;
@@ -106,24 +115,24 @@ fn treePrintPrefix(prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, co
                     if (p.child == u8) {
                         try writer.print(" \"{s}\"", .{arg});
                     }
-                    try writer.print(" \x1b[34m@{x}\x1b[m", .{@ptrToInt(arg.ptr)});
+                    try writer.print(" " ++ address_fmt, .{@ptrToInt(arg.ptr)});
                     {
                         const backup_len = prefix.items.len;
                         for (arg[0 .. arg.len - 1]) |item, i| {
-                            try writer.print("\n{s}├─\x1b[33m[{d}]\x1b[m", .{ prefix.items, i });
+                            try writer.print("\n{s}├─" ++ index_fmt, .{ prefix.items, i });
                             try prefix.appendSlice("│ ");
                             try treePrintPrefix(prefix, writer, item, "");
                             prefix.shrinkRetainingCapacity(backup_len);
                         }
                     }
                     {
-                        try writer.print("\n{s}└─\x1b[33m[{d}]\x1b[m", .{ prefix.items, arg.len - 1 });
+                        try writer.print("\n{s}└─" ++ index_fmt, .{ prefix.items, arg.len - 1 });
                         try prefix.appendSlice("  ");
                         try treePrintPrefix(prefix, writer, arg[arg.len - 1], "");
                     }
                 },
                 else => {
-                    try writer.print("{s} {s} \x1b[34m@{x}\x1b[m", .{ id_colored, type_name_colored, @ptrToInt(arg) });
+                    try writer.print("{s} {s} " ++ address_fmt, .{ id_colored, type_name_colored, @ptrToInt(arg) });
                 },
             }
         },
@@ -150,7 +159,7 @@ const Person = struct {
     // age: u8 = 34,
     // name: []const u8 = "jon",
     // cc: CreditCard = .{},
-    // code: [3]u8 = [_]u8{ 1, 2, 3 },
+    code: [3]u8 = [_]u8{ 1, 2, 3 },
     // k: type = u16,
     int_ptr: *const u8,
     f: *const fn () void = myFunc,
@@ -172,6 +181,11 @@ const Debt2 = struct {
     id: *u32,
 };
 
+const aa: u32 = 8;
+const Debt3 = struct {
+    id: *const u32 = &aa,
+};
+
 pub fn main() !void {
     var w = std.io.getStdOut().writer();
     var int: u8 = 7;
@@ -180,6 +194,12 @@ pub fn main() !void {
     const person = Person{
         .int_ptr = &int,
     };
+    std.log.info("person comptime? {}", .{isComptime(person)});
+    try treePrint(std.heap.page_allocator, w, person, "\nperson");
+
+    const d1 = Debt{};
+    std.log.info("debt comptime? {}", .{isComptime(d1)});
+    try treePrint(std.heap.page_allocator, w, d1, "d1");
 
     var cc = CreditCard{
         .name = "john",
@@ -190,20 +210,24 @@ pub fn main() !void {
             .amount = 888,
         },
     };
+    try treePrint(std.heap.page_allocator, w, cc, "\ncc");
+
     // const person1 = Person{
     //     .age = 20,
     //     .name = "John",
     //     .int_ptr = &int,
     // };
 
-    var i: u32 = 0;
+    comptime var i: u32 = 0;
     var d2 = Debt2{
         .id = &i,
     };
+    std.log.info("debt2 comptime? {}", .{isComptime(d2)});
+    try treePrint(std.heap.page_allocator, w, d2, "d2");
 
-    try treePrint(std.heap.page_allocator, w, d2, "d23333");
-    try treePrint(std.heap.page_allocator, w, person, "\nperson");
-    try treePrint(std.heap.page_allocator, w, cc, "\ncc");
+    const d3 = Debt3{};
+    std.log.info("debt3 comptime? {}", .{isComptime(d3)});
+    try treePrint(std.heap.page_allocator, w, d3, "d3");
 }
 
 inline fn isComptime(val: anytype) bool {
@@ -211,3 +235,5 @@ inline fn isComptime(val: anytype) bool {
 }
 
 fn myFunc() void {}
+
+// TODO: recursive pointers
