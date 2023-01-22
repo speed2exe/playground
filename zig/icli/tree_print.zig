@@ -1,6 +1,5 @@
 const std = @import("std");
 const builtin = std.builtin;
-const log = std.log;
 
 const ansi_esc_code = @import("./ansi_esc_code.zig");
 const Color = ansi_esc_code.Color;
@@ -14,7 +13,7 @@ pub const TreePrinter = struct {
     const address_fmt = comptimeInColor(Color.blue, "@{x}");
 
     /// settings
-    array_print_limit: usize = 10,
+    array_print_limit: usize = 10, // affects Arrays, Slice, Vector, minimum 1
     print_u8_chars: bool = true,
 
     allocator: std.mem.Allocator,
@@ -128,9 +127,19 @@ pub const TreePrinter = struct {
         }
     }
 
-    inline fn printArrayValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, arg_type: anytype) !void {
+    inline fn printArrayValues(
+        self: TreePrinter,
+        prefix: *std.ArrayList(u8),
+        writer: anytype,
+        arg: anytype,
+        arg_type: anytype,
+    ) !void {
         const backup_len = prefix.items.len;
         inline for (arg[0 .. arg_type.len - 1]) |item, i| {
+            if (i == self.array_print_limit - 1) {
+                try writer.print("\n{s}...{d} item(s) not shown", .{ prefix.items, arg.len - self.array_print_limit });
+                break;
+            }
             try writer.print("\n{s}├─", .{ prefix.items });
             try prefix.appendSlice("│ ");
             const index_colored = comptime comptimeFmtInColor(Color.yellow, "[{d}]", .{i});
@@ -143,11 +152,21 @@ pub const TreePrinter = struct {
         try self.printValueImpl(prefix, writer, arg[arg_type.len - 1], index_colored);
     }
 
-    inline fn printVectorValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, arg_type: anytype) !void {
+    inline fn printVectorValues(
+        self: TreePrinter,
+        prefix: *std.ArrayList(u8),
+        writer: anytype,
+        arg: anytype,
+        arg_type: anytype,
+    ) !void {
         const index_fmt = comptime comptimeInColor(Color.yellow, "[{d}]");
         const backup_len = prefix.items.len;
         var i: usize = 0;
         while (i < arg_type.len - 1) : (i += 1) {
+            if (i == self.array_print_limit - 1) {
+                try writer.print("\n{s}...{d} item(s) not shown", .{ prefix.items, arg_type.len - self.array_print_limit });
+                break;
+            }
             const item = arg[i];
             try writer.print("\n{s}├─" ++ index_fmt, .{ prefix.items, i });
             try prefix.appendSlice("│ ");
@@ -168,6 +187,10 @@ pub const TreePrinter = struct {
         const index_fmt = comptime comptimeInColor(Color.yellow, "[{d}]");
         const backup_len = prefix.items.len;
         for (arg[0 .. arg.len - 1]) |item, i| {
+            if (i == self.array_print_limit - 1) {
+                try writer.print("\n{s}...{d} item(s) not shown", .{ prefix.items, arg.len - self.array_print_limit });
+                break;
+            }
             try writer.print("\n{s}├─" ++ index_fmt, .{ prefix.items, i });
             try prefix.appendSlice("│ ");
             try self.printValueImpl(prefix, writer, item, "");
