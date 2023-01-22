@@ -52,12 +52,21 @@ pub const TreePrinter = struct {
             },
             .Array => |a| {
                 if (a.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{ arg });
-                if (arg.len == 0){
+                if (a.len == 0){
                     try writer.writeAll(empty);
                     return;
                 }
 
-                try self.printArrayValues(prefix, writer, arg);
+                try self.printArrayValues(prefix, writer, arg, a);
+            },
+            .Vector => |v| {
+                if (v.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{ arg });
+                if (v.len == 0){
+                    try writer.writeAll(empty);
+                    return;
+                }
+
+                try self.printVectorValues(prefix, writer, arg, v);
             },
             .Pointer => |p| {
                 switch (p.size) {
@@ -119,9 +128,9 @@ pub const TreePrinter = struct {
         }
     }
 
-    inline fn printArrayValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype,) !void {
+    inline fn printArrayValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, arg_type: anytype) !void {
         const backup_len = prefix.items.len;
-        inline for (arg[0 .. arg.len - 1]) |item, i| {
+        inline for (arg[0 .. arg_type.len - 1]) |item, i| {
             try writer.print("\n{s}├─", .{ prefix.items });
             try prefix.appendSlice("│ ");
             const index_colored = comptime comptimeFmtInColor(Color.yellow, "[{d}]", .{i});
@@ -131,7 +140,23 @@ pub const TreePrinter = struct {
         try writer.print("\n{s}└─", .{ prefix.items });
         try prefix.appendSlice("  ");
         const index_colored = comptime comptimeFmtInColor(Color.yellow, "[{d}]", .{arg.len - 1});
-        try self.printValueImpl(prefix, writer, arg[arg.len - 1], index_colored);
+        try self.printValueImpl(prefix, writer, arg[arg_type.len - 1], index_colored);
+    }
+
+    inline fn printVectorValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, arg_type: anytype) !void {
+        const index_fmt = comptime comptimeInColor(Color.yellow, "[{d}]");
+        const backup_len = prefix.items.len;
+        var i: usize = 0;
+        while (i < arg_type.len - 1) : (i += 1) {
+            const item = arg[i];
+            try writer.print("\n{s}├─" ++ index_fmt, .{ prefix.items, i });
+            try prefix.appendSlice("│ ");
+            try self.printValueImpl(prefix, writer, item, "");
+            prefix.shrinkRetainingCapacity(backup_len);
+        }
+        try writer.print("\n{s}└─" ++ index_fmt, .{ prefix.items, i });
+        try prefix.appendSlice("  ");
+        try self.printValueImpl(prefix, writer, arg[arg_type.len - 1], "");
     }
 
     inline fn printSliceValues(
@@ -205,7 +230,6 @@ pub const TreePrinter = struct {
 var i32_value: i32 = 42;
 
 const Struct1 = struct {
-
     // can only be printed if S is comptime known
     // k: type = u16,
 
@@ -220,7 +244,8 @@ const Struct1 = struct {
     field_array_u8: [3]u8 = [_]u8{ 1, 2, 3 },
     field_array_u8_empty: [0]u8 = .{},
 
-    field_s2: Struct2 = .{},
+    field_struct2: Struct2 = .{},
+    field_struct4: Struct4 = .{},
     field_comptime_float: comptime_float = 3.14,
     field_comptime_int: comptime_int = 11,
     field_null: @TypeOf(null) = null,
@@ -245,6 +270,11 @@ const Struct1 = struct {
 
     field_fn_ptr: *const fn () void = functionOne,
     field_fn: fn () void = functionOne,
+
+    // TODO: support Frame and AnyFrame
+    // field_anyframe: anyframe = undefined,
+
+    field_vector: @Vector(4, i32) = .{ 1, 2, 3, 4 },
 };
 
 const Struct2 = struct {
@@ -255,6 +285,8 @@ const Struct2 = struct {
 const Struct3 = struct {
     field_i32: i32 = 33,
 };
+
+const Struct4 = struct {};
 
 const ErrorSet1 = error{
     Error1,
@@ -291,8 +323,6 @@ pub fn main() !void {
 
     const struct1 = Struct1{};
     try tree_printer.printValueWithId(w, struct1, "struct1");
-
-    std.log.info("{s}", .{@typeName(@This())});
 }
 
 inline fn isComptime(val: anytype) bool {
