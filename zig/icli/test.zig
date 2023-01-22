@@ -1,12 +1,42 @@
 const std = @import("std");
 const tree_print = @import("tree_print.zig");
 const k = @import("./other.zig");
+const j = @import("./something.zig");
 
-usingnamespace @import("std");
+const S = struct {
+    a: i32,
+};
+
+fn s() S {
+    // const s2 = S{ .a = 1 };
+    // std.debug.print("s2 addr: {d}\n", .{@ptrToInt(&s2)});
+    // const s3 = S{ .a = 2 };
+    // std.debug.print("s3 addr: {d}\n", .{@ptrToInt(&s3)});
+
+    // var i: u32 = 32;
+    // if (i == 32) {
+    //     return s2;
+    // } else {
+    //     return s3;
+    // }
+
+    // return s2;
+
+}
 
 pub fn main() !void {
-    var lol = k.Something{};
-    _ = lol;
+    // const s1 = s();
+    // std.debug.print("s1 addr: {d}\n", .{@ptrToInt(&s1)});
+    const stdd = std{};
+    _ = stdd;
+
+    // k.Something.a = 7;
+
+    // std.log.info("k: a: {}", .{k.Something.a});
+    // std.log.info("j: a: {}", .{j.Something.a});
+
+    // var lol = k.Something{};
+    // _ = lol;
 
     // const arr: [4]u8 = [_]u8{
     //     0b11111111,
@@ -50,3 +80,4 @@ pub fn main() !void {
 //     _ = context;
 //     lessThan(a, b);
 // }
+

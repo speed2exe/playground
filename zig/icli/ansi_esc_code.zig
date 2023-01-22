@@ -1,11 +1,18 @@
 const std = @import("std");
 
-pub fn comptimePrintInColor(
+pub fn comptimeFmtInColor(
     comptime color: Color,
     comptime fmt: []const u8,
     args: anytype,
 ) []const u8 {
     return std.fmt.comptimePrint(color.toEscapeCode() ++ fmt ++ reset, args);
+}
+
+pub fn comptimeInColor(
+    comptime color: Color,
+    comptime fmt: []const u8,
+) []const u8 {
+    return comptime color.toEscapeCode() ++ fmt ++ reset;
 }
 
 pub const Color = enum {
