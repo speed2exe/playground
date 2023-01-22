@@ -36,8 +36,9 @@ pub const TreePrinter = struct {
 
     fn printValueImpl(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime id: []const u8) !void {
         const arg_type = @TypeOf(arg);
-        try writer.print("{s} {s}", .{ 
+        try writer.print("{s}{s}{s}", .{ 
             comptimeInColor(Color.yellow, id),
+            comptimeInColor(Color.bright_black, ": "),
             comptimeInColor(Color.cyan, @typeName(arg_type)),
         });
 
@@ -47,7 +48,7 @@ pub const TreePrinter = struct {
                     try writer.writeAll(empty);
                     return;
                 }
-                try self.printStructValues(prefix, writer, arg, s);
+                try self.printFieldValues(prefix, writer, arg, s);
             },
             .Array => |a| {
                 if (a.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{ arg });
@@ -101,13 +102,24 @@ pub const TreePrinter = struct {
                 try writer.print(" \n{s}└─", .{ prefix.items });
                 try self.printValueImpl(prefix, writer, value, ".?");
             },
+            .Union => |u| {
+                if (u.fields.len == 0) {
+                    try writer.writeAll(empty);
+                    return;
+                }
+                if (u.tag_type) |_| {
+                    try self.printFieldValueAtIndex(prefix,writer, arg, u, @enumToInt(arg));
+                } else {
+                    try self.printFieldValues(prefix, writer, arg, u);
+                }
+            },
             .Enum => try writer.print(" {s} {} ({d})", .{ arrow, arg, @enumToInt(arg) }),
             .Fn => try writer.print(" " ++ address_fmt, .{ @ptrToInt(&arg) }),
             else => try writer.print(" {s} {any}", .{ arrow, arg }),
         }
     }
 
-    inline fn printArrayValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype) !void {
+    inline fn printArrayValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype,) !void {
         const backup_len = prefix.items.len;
         inline for (arg[0 .. arg.len - 1]) |item, i| {
             try writer.print("\n{s}├─", .{ prefix.items });
@@ -122,7 +134,12 @@ pub const TreePrinter = struct {
         try self.printValueImpl(prefix, writer, arg[arg.len - 1], index_colored);
     }
 
-    inline fn printSliceValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype) !void {
+    inline fn printSliceValues(
+        self: TreePrinter,
+        prefix: *std.ArrayList(u8),
+        writer: anytype,
+        arg: anytype,
+    ) !void {
         const index_fmt = comptime comptimeInColor(Color.yellow, "[{d}]");
         const backup_len = prefix.items.len;
         for (arg[0 .. arg.len - 1]) |item, i| {
@@ -136,20 +153,52 @@ pub const TreePrinter = struct {
         try self.printValueImpl(prefix, writer, arg[arg.len - 1], "");
     }
 
-    inline fn printStructValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime s: std.builtin.Type.Struct) !void {
+    inline fn printFieldValues(
+        self: TreePrinter,
+        prefix: *std.ArrayList(u8),
+        writer: anytype,
+        arg: anytype,
+        comptime arg_type: anytype,
+    ) !void {
+        // Note:
+        // This is set so that unions can be printed for all its values
+        // This can be removed if we are able to determine the active union
+        // field during ReleaseSafe and Debug builds,
+        @setRuntimeSafety(false);
+
         const backup_len = prefix.items.len;
-        const last_field_idx = s.fields.len - 1;
-        inline for (s.fields[0..last_field_idx]) |field| {
+        const last_field_idx = arg_type.fields.len - 1;
+        inline for (arg_type.fields[0..last_field_idx]) |field| {
             try writer.print("\n{s}├─", .{prefix.items});
             try prefix.appendSlice("│ ");
             try self.printValueImpl(prefix, writer, @field(arg, field.name), "." ++ field.name);
             prefix.shrinkRetainingCapacity(backup_len);
         }
         try writer.print("\n{s}└─", .{prefix.items});
-        const last_field_name = s.fields[last_field_idx].name;
+        const last_field_name = arg_type.fields[last_field_idx].name;
         try prefix.appendSlice("  ");
         try self.printValueImpl(prefix, writer, @field(arg, last_field_name), "." ++ last_field_name);
         prefix.shrinkRetainingCapacity(backup_len);
+    }
+
+    inline fn printFieldValueAtIndex(
+        self: TreePrinter,
+        prefix: *std.ArrayList(u8),
+        writer: anytype,
+        arg: anytype,
+        arg_type: anytype,
+        idx: usize,
+    ) !void {
+        const backup_len = prefix.items.len;
+        inline for (arg_type.fields) |field, i| {
+            if (i == idx) {
+                try writer.print("\n{s}└─", .{prefix.items});
+                try prefix.appendSlice("  ");
+                try self.printValueImpl(prefix, writer, @field(arg, field.name), "." ++ field.name);
+                prefix.shrinkRetainingCapacity(backup_len);
+                return;
+            }
+        }
     }
 };
 
@@ -186,8 +235,16 @@ const Struct1 = struct {
     field_enum_1: EnumSet1 = .Enum1,
     field_enum_2: EnumSet2 = .Enum3,
 
-    field_fn_ptr: *const fn () void = myFunc,
-    field_fn: fn () void = myFunc,
+    field_union_1: Union1 = .{ .int = 98 },
+    field_union_2: Union1 = .{ .float = 3.14 },
+    field_union_3: Union1 = .{ .bool = true },
+
+    field_tagged_union_1: TaggedUnion1 = .{ .int = 98 },
+    field_tagged_union_2: TaggedUnion1 = .{ .float = 3.14 },
+    field_tagged_union_3: TaggedUnion1 = .{ .bool = true },
+
+    field_fn_ptr: *const fn () void = functionOne,
+    field_fn: fn () void = functionOne,
 };
 
 const Struct2 = struct {
@@ -214,26 +271,30 @@ const EnumSet2 = enum(i32) {
     Enum4 = 999,
 };
 
+const Union1 = union {
+    int: i32,
+    float: f32,
+    bool: bool,
+};
+
+const TaggedUnion1 = union(enum) {
+    int: i32,
+    float: f32,
+    bool: bool,
+};
+
+fn functionOne() void {}
+
 pub fn main() !void {
     var w = std.io.getStdOut().writer();
     var tree_printer = TreePrinter.init(std.heap.page_allocator);
 
     const struct1 = Struct1{};
     try tree_printer.printValueWithId(w, struct1, "struct1");
-}
 
-const MyErrors = error{
-    A,
-    B,
-};
+    std.log.info("{s}", .{@typeName(@This())});
+}
 
 inline fn isComptime(val: anytype) bool {
     return @typeInfo(@TypeOf(.{val})).Struct.fields[0].is_comptime;
 }
-
-fn myFunc() void {}
-
-// TODO: recursive pointers
-// TODO: limit items in array
-// TODO: type printing
-
