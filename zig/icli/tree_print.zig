@@ -8,8 +8,11 @@ const comptimeFmtInColor = ansi_esc_code.comptimeFmtInColor;
 const comptimeInColor = ansi_esc_code.comptimeInColor;
 
 const arrow = comptimeFmtInColor(Color.bright_black, "=>", .{});
+const empty = " " ++ arrow ++ " {}";
 
 pub const TreePrinter = struct {
+    const address_fmt = comptimeInColor(Color.blue, "@{x}");
+
     /// settings
     array_print_limit: usize = 10,
     print_u8_chars: bool = true,
@@ -32,44 +35,33 @@ pub const TreePrinter = struct {
     }
 
     fn printValueImpl(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime id: []const u8) !void {
-
         const arg_type = @TypeOf(arg);
-        const type_info = @typeInfo(arg_type);
-        const type_name = @typeName(arg_type);
-        const type_name_colored = comptimeInColor(Color.cyan, type_name);
-        const id_colored = comptimeInColor(Color.yellow, id);
+        try writer.print("{s} {s}", .{ 
+            comptimeInColor(Color.yellow, id),
+            comptimeInColor(Color.cyan, @typeName(arg_type)),
+        });
 
-        switch (type_info) {
+        switch (@typeInfo(arg_type)) {
             .Struct => |s| {
-                try writer.print("{s} {s}", .{ id_colored, type_name_colored });
-                const backup_len = prefix.items.len;
-                const field_count = s.fields.len;
-                if (field_count == 0) return;
-                const last_field_idx = field_count - 1;
-                inline for (s.fields[0..last_field_idx]) |field| {
-                    try writer.print("\n{s}├─", .{prefix.items});
-                    try prefix.appendSlice("│ ");
-                    try self.printValueImpl(prefix, writer, @field(arg, field.name), "." ++ field.name);
-                    prefix.shrinkRetainingCapacity(backup_len);
+                if (s.fields.len == 0) {
+                    try writer.writeAll(empty);
+                    return;
                 }
-                try writer.print("\n{s}└─", .{prefix.items});
-                const last_field_name = s.fields[last_field_idx].name;
-                try prefix.appendSlice("  ");
-                try self.printValueImpl(prefix, writer, @field(arg, last_field_name), "." ++ last_field_name);
-                prefix.shrinkRetainingCapacity(backup_len);
+                try self.printStructValues(prefix, writer, arg, s);
             },
             .Array => |a| {
-                try writer.print("{s} {s}", .{ id_colored, type_name_colored });
-                if (arg.len == 0) return;
-                if (a.child == u8 and self.print_u8_chars) try writer.print(" {s} {s}", .{ arrow, arg });
+                if (a.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{ arg });
+                if (arg.len == 0){
+                    try writer.writeAll(empty);
+                    return;
+                }
+
                 try self.printArrayValues(prefix, writer, arg);
             },
             .Pointer => |p| {
-                const address_fmt = comptime comptimeFmtInColor(Color.blue, "@{{x}}", .{});
                 switch (p.size) {
                     .One => {
-                        try writer.print("{s} {s} " ++ address_fmt, .{ id_colored, type_name_colored, @ptrToInt(arg) });
-
+                        try writer.print(" " ++ address_fmt, .{ @ptrToInt(arg) });
                         // TODO: segment ignores unprintable values, verification is needed
                         if (p.child == anyopaque) return;
                         const child_type_info = @typeInfo(p.child);
@@ -91,34 +83,31 @@ pub const TreePrinter = struct {
                         prefix.shrinkRetainingCapacity(backup_len);
                     },
                     .Slice => {
-                        try writer.print("{s} {s} " ++ address_fmt, .{ id_colored, type_name_colored, @ptrToInt(arg.ptr)});
-                        if (arg.len == 0) return;
+                        try writer.print(" " ++ address_fmt, .{ @ptrToInt(arg.ptr) });
                         if (p.child == u8 and self.print_u8_chars) try writer.print(" \"{s}\"", .{arg});
-                        // try self.printSliceValues(prefix, writer, arg);
+                        if (arg.len == 0) return;
+                        try self.printSliceValues(prefix, writer, arg);
                     },
                     else => {
-                        try writer.print("{s} {s} " ++ address_fmt, .{ id_colored, type_name_colored, @ptrToInt(arg) });
+                        try writer.print(" {s} {any}", .{ arrow, arg });
                     },
                 }
             },
             .Optional => {
                 const value = arg orelse {
-                    try writer.print("{s} {s} {s} null", .{ id_colored, type_name_colored, arrow });
+                    try writer.print(" {s} null", .{ arrow });
                     return;
                 };
-                try writer.print("{s} {s} \n{s}└─", .{ id_colored, type_name_colored, prefix.items });
+                try writer.print(" \n{s}└─", .{ prefix.items });
                 try self.printValueImpl(prefix, writer, value, ".?");
             },
-            .ErrorUnion => {
-                // TODO:
-            },
-            else => {
-                try writer.print("{s} {s} {s} {any}", .{ id_colored, type_name_colored, arrow, arg });
-            },
+            .Enum => try writer.print(" {s} {} ({d})", .{ arrow, arg, @enumToInt(arg) }),
+            .Fn => try writer.print(" " ++ address_fmt, .{ @ptrToInt(&arg) }),
+            else => try writer.print(" {s} {any}", .{ arrow, arg }),
         }
     }
 
-    fn printArrayValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype) !void {
+    inline fn printArrayValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype) !void {
         const backup_len = prefix.items.len;
         inline for (arg[0 .. arg.len - 1]) |item, i| {
             try writer.print("\n{s}├─", .{ prefix.items });
@@ -133,8 +122,8 @@ pub const TreePrinter = struct {
         try self.printValueImpl(prefix, writer, arg[arg.len - 1], index_colored);
     }
 
-    fn printSliceValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype) !void {
-        const index_fmt = comptime comptimeFmtInColor(Color.yellow, "[{{d}}]", .{});
+    inline fn printSliceValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype) !void {
+        const index_fmt = comptime comptimeInColor(Color.yellow, "[{d}]");
         const backup_len = prefix.items.len;
         for (arg[0 .. arg.len - 1]) |item, i| {
             try writer.print("\n{s}├─" ++ index_fmt, .{ prefix.items, i });
@@ -146,124 +135,91 @@ pub const TreePrinter = struct {
         try prefix.appendSlice("  ");
         try self.printValueImpl(prefix, writer, arg[arg.len - 1], "");
     }
+
+    inline fn printStructValues(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime s: std.builtin.Type.Struct) !void {
+        const backup_len = prefix.items.len;
+        const last_field_idx = s.fields.len - 1;
+        inline for (s.fields[0..last_field_idx]) |field| {
+            try writer.print("\n{s}├─", .{prefix.items});
+            try prefix.appendSlice("│ ");
+            try self.printValueImpl(prefix, writer, @field(arg, field.name), "." ++ field.name);
+            prefix.shrinkRetainingCapacity(backup_len);
+        }
+        try writer.print("\n{s}└─", .{prefix.items});
+        const last_field_name = s.fields[last_field_idx].name;
+        try prefix.appendSlice("  ");
+        try self.printValueImpl(prefix, writer, @field(arg, last_field_name), "." ++ last_field_name);
+        prefix.shrinkRetainingCapacity(backup_len);
+    }
 };
 
-const Person = struct {
-    o_i: ?i32 = 9,
-    // o_j: ?i32 = null,
-    // v: void = undefined,
-    // b: bool = true,
-    // f: f32 = 3.14,
-    // age: u8 = 34,
-    name: []const u8 = "jon",
-    // cc: CreditCard = .{},
-    code: [3]u8 = [_]u8{ 1, 2, 3 },
+var i32_value: i32 = 42;
+
+const Struct1 = struct {
+
+    // can only be printed if S is comptime known
     // k: type = u16,
-    // int_ptr: *const u8,
-    f: *const fn () void = myFunc,
+
+    field_void: void = undefined,
+    field_bool: bool = true,
+    field_u8: u32 = 11,
+    field_float: f32 = 3.14,
+
+    field_i32_ptr: *i32 = &i32_value,
+    field_slice_u8: []const u8 = "s1 string",
+
+    field_array_u8: [3]u8 = [_]u8{ 1, 2, 3 },
+    field_array_u8_empty: [0]u8 = .{},
+
+    field_s2: Struct2 = .{},
+    field_comptime_float: comptime_float = 3.14,
+    field_comptime_int: comptime_int = 11,
+    field_null: @TypeOf(null) = null,
+
+    field_opt_i32_value: ?i32 = 9,
+    field_opt_i32_null: ?i32 = null,
+
+    field_error: ErrorSet1 = error.Error1,
+    field_error_union_error: anyerror!u8 = error.Error2,
+    field_error_union_value: ErrorSet1!u8 = 5,
+
+    field_enum_1: EnumSet1 = .Enum1,
+    field_enum_2: EnumSet2 = .Enum3,
+
+    field_fn_ptr: *const fn () void = myFunc,
+    field_fn: fn () void = myFunc,
 };
 
-const CreditCard = struct {
-    const whatever: u8 = 251;
-
-    name: []const u8 = "john",
-    number: u64 = 999,
-    number2: u64 = 999,
-    debt: Debt = .{},
+const Struct2 = struct {
+    field_s3: Struct3 = .{},
+    field_slice_s3: []const Struct3 = &.{ .{}, .{} },
 };
 
-const Debt = struct {
-    id: u32 = 0,
-    amount: u64 = 888,
+const Struct3 = struct {
+    field_i32: i32 = 33,
 };
 
-const Debt2 = struct {
-    id: *u32,
+const ErrorSet1 = error{
+    Error1,
+    Error2,
 };
 
-const aa: u32 = 8;
-const Debt3 = struct {
-    id: *const u32 = &aa,
+const EnumSet1 = enum {
+    Enum1,
+    Enum2,
 };
 
-const Debt4 = struct {
-    const whatever: u8 = 251;
-    const whatever2: u8 = 252;
-    id: u32 = 0,
+const EnumSet2 = enum(i32) {
+    Enum3 = -999,
+    Enum4 = 999,
 };
 
 pub fn main() !void {
     var w = std.io.getStdOut().writer();
     var tree_printer = TreePrinter.init(std.heap.page_allocator);
 
-    // var int: u8 = 7;
-    // std.fmt.format
-    // const person = Person{
-    //     .int_ptr = &int,
-    // };
-    // std.log.info("person comptime? {}", .{isComptime(person)});
-    // try treePrint(std.heap.page_allocator, w, person, "\nperson");
-
-    // const d1 = Debt{};
-    // std.log.info("debt comptime? {}", .{isComptime(d1)});
-    // try treePrint(std.heap.page_allocator, w, d1, "d1");
-
-    // const cc = CreditCard{
-    //     .name = "john",
-    //     .number = 999,
-    //     .number2 = 999,
-    //     .debt = Debt{
-    //         .id = 0,
-    //         .amount = 888,
-    //     },
-    // };
-    // std.log.info("cc comptime? {}", .{isComptime(cc)});
-    // try treePrint(std.heap.page_allocator, w, cc, "\ncc");
-
-    // const person1 = Person{
-    //     .age = 20,
-    //     .name = "John",
-    //     .int_ptr = &int,
-    // };
-
-    // comptime var i: u32 = 0;
-    // var d2 = Debt2{
-    //     .id = &i,
-    // };
-    // std.log.info("debt2 comptime? {}", .{isComptime(d2)});
-    // try treePrint(std.heap.page_allocator, w, d2, "d2");
-
-    // const d3 = Debt3{};
-    // std.log.info("debt3 comptime? {}", .{isComptime(d3)});
-    // try treePrint(std.heap.page_allocator, w, d3, "d3");
-
-    // const debt4 = Debt4{};
-    // std.log.info("debt4 comptime? {}", .{isComptime(debt4)});
-    // try tree_printer.printValueWithId(w, debt4, "debt4");
-
-    // const p1 = Person{};
-    // std.log.info("p1 comptime? {}", .{isComptime(p1)});
-    // try tree_printer.printValueWithId(w, p1, "p1");
-
-    // const S2 = struct {
-    //     b: []const u8 = "s2 default",
-    //     // f: fn () void = myFunc,
-    // };
-    // _ = S2;
-    // const S = struct {
-    //     a: []const u8 = "",
-    //     // b: *const S2 = &S2{},
-    //     // e: MyErrors = MyErrors.A,
-    // };
-
-    // const s = S{};
-    // _ = s;
-    // std.log.info("s is comptime known? {}", .{isComptime(s)});
-    // try tree_printer.printValueWithId(w, s, "s");
-    try tree_printer.printValue(w, MyErrors.A);
-    std.debug.print("{any}", .{18});
-    // _ = w;
-    // _ = tree_printer;
+    const struct1 = Struct1{};
+    try tree_printer.printValueWithId(w, struct1, "struct1");
 }
 
 const MyErrors = error{
@@ -280,3 +236,4 @@ fn myFunc() void {}
 // TODO: recursive pointers
 // TODO: limit items in array
 // TODO: type printing
+
