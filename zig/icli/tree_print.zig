@@ -12,9 +12,13 @@ const empty = " " ++ arrow ++ " {}";
 pub const TreePrinter = struct {
     const address_fmt = comptimeInColor(Color.blue, "@{x}");
 
+    // key: pointer address, value: number of repeats
+    const CountsByAddress = std.AutoHashMap(usize, usize);
+
     /// settings
     array_print_limit: usize = 10, // affects Arrays, Slice, Vector, minimum 1
     print_u8_chars: bool = true,
+    ptr_recursive_limit: usize = 10,
 
     allocator: std.mem.Allocator,
 
@@ -29,11 +33,19 @@ pub const TreePrinter = struct {
     pub fn printValueWithId(self: TreePrinter, writer: anytype, arg: anytype, comptime id: []const u8) !void {
         var prefix = std.ArrayList(u8).init(self.allocator);
         defer prefix.deinit();
-        try self.printValueImpl(&prefix, writer, arg, id);
+        var counts_by_address = CountsByAddress.init(self.allocator);
+        try self.printValueImpl(&prefix, &counts_by_address, writer, arg, id);
         try writer.print("\n", .{});
     }
 
-    fn printValueImpl(self: TreePrinter, prefix: *std.ArrayList(u8), writer: anytype, arg: anytype, comptime id: []const u8) !void {
+    fn printValueImpl(
+        self: TreePrinter,
+        prefix: *std.ArrayList(u8),
+        counts_by_address: *CountsByAddress,
+        writer: anytype,
+        arg: anytype,
+        comptime id: []const u8,
+    ) !void {
         const arg_type = @TypeOf(arg);
         try writer.print("{s}{s}{s}", .{ 
             comptimeInColor(Color.yellow, id),
@@ -47,7 +59,7 @@ pub const TreePrinter = struct {
                     try writer.writeAll(empty);
                     return;
                 }
-                try self.printFieldValues(prefix, writer, arg, s);
+                try self.printFieldValues(prefix, counts_by_address, writer, arg, s);
             },
             .Array => |a| {
                 if (a.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{ arg });
@@ -56,7 +68,7 @@ pub const TreePrinter = struct {
                     return;
                 }
 
-                try self.printArrayValues(prefix, writer, arg, a);
+                try self.printArrayValues(prefix, counts_by_address, writer, arg, a);
             },
             .Vector => |v| {
                 if (v.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{ arg });
@@ -65,13 +77,27 @@ pub const TreePrinter = struct {
                     return;
                 }
 
-                try self.printVectorValues(prefix, writer, arg, v);
+                try self.printVectorValues(prefix, counts_by_address, writer, arg, v);
             },
             .Pointer => |p| {
                 switch (p.size) {
-                    .One => {
-                        try writer.print(" " ++ address_fmt, .{ @ptrToInt(arg) });
+                    .One => { 
+                        const addr: usize = @ptrToInt(arg);
+                        try writer.print(" " ++ address_fmt, .{addr});
+
+                        // TODO: verify
+                        if (counts_by_address.getPtr(addr)) |counts_ptr| {
+                            if (counts_ptr.* >= self.ptr_recursive_limit) {
+                                try writer.print("...(Repeated)", .{});
+                                return;
+                            }
+                            counts_ptr.* += 1;
+                        } else {
+                            try counts_by_address.put(addr, 1);
+                        }
+
                         // TODO: segment ignores unprintable values, verification is needed
+                        if (addr == 0) return;
                         if (p.child == anyopaque) return;
                         const child_type_info = @typeInfo(p.child);
                         switch (child_type_info) {
@@ -88,14 +114,14 @@ pub const TreePrinter = struct {
                         try writer.print("\n{s}└─", .{prefix.items});
                         const backup_len = prefix.items.len;
                         try prefix.appendSlice("  ");
-                        try self.printValueImpl(prefix, writer, arg.*, ".*");
+                        try self.printValueImpl(prefix, counts_by_address, writer, arg.*, ".*");
                         prefix.shrinkRetainingCapacity(backup_len);
                     },
                     .Slice => {
                         try writer.print(" " ++ address_fmt, .{ @ptrToInt(arg.ptr) });
                         if (p.child == u8 and self.print_u8_chars) try writer.print(" \"{s}\"", .{arg});
                         if (arg.len == 0) return;
-                        try self.printSliceValues(prefix, writer, arg);
+                        try self.printSliceValues(prefix, counts_by_address, writer, arg);
                     },
                     else => {
                         try writer.print(" {s} {any}", .{ arrow, arg });
@@ -103,12 +129,13 @@ pub const TreePrinter = struct {
                 }
             },
             .Optional => {
-                const value = arg orelse {
+                // TODO: compilation issues
+                if (arg) |value| {
+                    try writer.print(" \n{s}└─", .{ prefix.items });
+                    try self.printValueImpl(prefix, counts_by_address, writer, value, ".?");
+                } else {
                     try writer.print(" {s} null", .{ arrow });
-                    return;
-                };
-                try writer.print(" \n{s}└─", .{ prefix.items });
-                try self.printValueImpl(prefix, writer, value, ".?");
+                }
             },
             .Union => |u| {
                 if (u.fields.len == 0) {
@@ -116,9 +143,9 @@ pub const TreePrinter = struct {
                     return;
                 }
                 if (u.tag_type) |_| {
-                    try self.printFieldValueAtIndex(prefix,writer, arg, u, @enumToInt(arg));
+                    try self.printFieldValueAtIndex(prefix, counts_by_address, writer, arg, u, @enumToInt(arg));
                 } else {
-                    try self.printFieldValues(prefix, writer, arg, u);
+                    try self.printFieldValues(prefix, counts_by_address, writer, arg, u);
                 }
             },
             .Enum => try writer.print(" {s} {} ({d})", .{ arrow, arg, @enumToInt(arg) }),
@@ -130,6 +157,7 @@ pub const TreePrinter = struct {
     inline fn printArrayValues(
         self: TreePrinter,
         prefix: *std.ArrayList(u8),
+        counts_by_address: *CountsByAddress,
         writer: anytype,
         arg: anytype,
         arg_type: anytype,
@@ -143,18 +171,19 @@ pub const TreePrinter = struct {
             try writer.print("\n{s}├─", .{ prefix.items });
             try prefix.appendSlice("│ ");
             const index_colored = comptime comptimeFmtInColor(Color.yellow, "[{d}]", .{i});
-            try self.printValueImpl(prefix, writer, item, index_colored);
+            try self.printValueImpl(prefix, counts_by_address, writer, item, index_colored);
             prefix.shrinkRetainingCapacity(backup_len);
         }
         try writer.print("\n{s}└─", .{ prefix.items });
         try prefix.appendSlice("  ");
         const index_colored = comptime comptimeFmtInColor(Color.yellow, "[{d}]", .{arg.len - 1});
-        try self.printValueImpl(prefix, writer, arg[arg_type.len - 1], index_colored);
+        try self.printValueImpl(prefix, counts_by_address, writer, arg[arg_type.len - 1], index_colored);
     }
 
     inline fn printVectorValues(
         self: TreePrinter,
         prefix: *std.ArrayList(u8),
+        counts_by_address: *CountsByAddress,
         writer: anytype,
         arg: anytype,
         arg_type: anytype,
@@ -170,17 +199,18 @@ pub const TreePrinter = struct {
             const item = arg[i];
             try writer.print("\n{s}├─" ++ index_fmt, .{ prefix.items, i });
             try prefix.appendSlice("│ ");
-            try self.printValueImpl(prefix, writer, item, "");
+            try self.printValueImpl(prefix, counts_by_address, writer, item, "");
             prefix.shrinkRetainingCapacity(backup_len);
         }
         try writer.print("\n{s}└─" ++ index_fmt, .{ prefix.items, i });
         try prefix.appendSlice("  ");
-        try self.printValueImpl(prefix, writer, arg[arg_type.len - 1], "");
+        try self.printValueImpl(prefix, counts_by_address, writer, arg[arg_type.len - 1], "");
     }
 
     inline fn printSliceValues(
         self: TreePrinter,
         prefix: *std.ArrayList(u8),
+        counts_by_address: *CountsByAddress,
         writer: anytype,
         arg: anytype,
     ) !void {
@@ -193,17 +223,18 @@ pub const TreePrinter = struct {
             }
             try writer.print("\n{s}├─" ++ index_fmt, .{ prefix.items, i });
             try prefix.appendSlice("│ ");
-            try self.printValueImpl(prefix, writer, item, "");
+            try self.printValueImpl(prefix, counts_by_address, writer, item, "");
             prefix.shrinkRetainingCapacity(backup_len);
         }
         try writer.print("\n{s}└─" ++ index_fmt, .{ prefix.items, arg.len - 1 });
         try prefix.appendSlice("  ");
-        try self.printValueImpl(prefix, writer, arg[arg.len - 1], "");
+        try self.printValueImpl(prefix, counts_by_address, writer, arg[arg.len - 1], "");
     }
 
     inline fn printFieldValues(
         self: TreePrinter,
         prefix: *std.ArrayList(u8),
+        counts_by_address: *CountsByAddress,
         writer: anytype,
         arg: anytype,
         comptime arg_type: anytype,
@@ -219,19 +250,20 @@ pub const TreePrinter = struct {
         inline for (arg_type.fields[0..last_field_idx]) |field| {
             try writer.print("\n{s}├─", .{prefix.items});
             try prefix.appendSlice("│ ");
-            try self.printValueImpl(prefix, writer, @field(arg, field.name), "." ++ field.name);
+            try self.printValueImpl(prefix, counts_by_address, writer, @field(arg, field.name), "." ++ field.name);
             prefix.shrinkRetainingCapacity(backup_len);
         }
         try writer.print("\n{s}└─", .{prefix.items});
         const last_field_name = arg_type.fields[last_field_idx].name;
         try prefix.appendSlice("  ");
-        try self.printValueImpl(prefix, writer, @field(arg, last_field_name), "." ++ last_field_name);
+        try self.printValueImpl(prefix, counts_by_address, writer, @field(arg, last_field_name), "." ++ last_field_name);
         prefix.shrinkRetainingCapacity(backup_len);
     }
 
     inline fn printFieldValueAtIndex(
         self: TreePrinter,
         prefix: *std.ArrayList(u8),
+        counts_by_address: *CountsByAddress,
         writer: anytype,
         arg: anytype,
         arg_type: anytype,
@@ -242,7 +274,7 @@ pub const TreePrinter = struct {
             if (i == idx) {
                 try writer.print("\n{s}└─", .{prefix.items});
                 try prefix.appendSlice("  ");
-                try self.printValueImpl(prefix, writer, @field(arg, field.name), "." ++ field.name);
+                try self.printValueImpl(prefix, counts_by_address, writer, @field(arg, field.name), "." ++ field.name);
                 prefix.shrinkRetainingCapacity(backup_len);
                 return;
             }
@@ -253,8 +285,11 @@ pub const TreePrinter = struct {
 var i32_value: i32 = 42;
 
 const Struct1 = struct {
-    // can only be printed if S is comptime known
+    // valid in comptime
     // k: type = u16,
+    // field_comptime_float: comptime_float = 3.14,
+    // field_comptime_int: comptime_int = 11,
+    // field_fn: fn () void = functionOne,
 
     field_void: void = undefined,
     field_bool: bool = true,
@@ -269,8 +304,10 @@ const Struct1 = struct {
 
     field_struct2: Struct2 = .{},
     field_struct4: Struct4 = .{},
-    field_comptime_float: comptime_float = 3.14,
-    field_comptime_int: comptime_int = 11,
+
+    // TODO: not working, need to fix
+    // field_struct_recursive: LinkedNode,
+
     field_null: @TypeOf(null) = null,
 
     field_opt_i32_value: ?i32 = 9,
@@ -292,12 +329,10 @@ const Struct1 = struct {
     field_tagged_union_3: TaggedUnion1 = .{ .bool = true },
 
     field_fn_ptr: *const fn () void = functionOne,
-    field_fn: fn () void = functionOne,
+    field_vector: @Vector(4, i32) = .{ 1, 2, 3, 4 },
 
     // TODO: support Frame and AnyFrame
     // field_anyframe: anyframe = undefined,
-
-    field_vector: @Vector(4, i32) = .{ 1, 2, 3, 4 },
 };
 
 const Struct2 = struct {
@@ -310,6 +345,14 @@ const Struct3 = struct {
 };
 
 const Struct4 = struct {};
+
+const LinkedNode = struct {
+    val: i32,
+    next: *LinkedNode = undefined,
+};
+
+const LinkedNode2 = struct {
+};
 
 const ErrorSet1 = error{
     Error1,
@@ -344,10 +387,24 @@ pub fn main() !void {
     var w = std.io.getStdOut().writer();
     var tree_printer = TreePrinter.init(std.heap.page_allocator);
 
-    const struct1 = Struct1{};
+    // var node1: LinkedNode = .{};
+    // var node2: LinkedNode = .{.next = &node1};
+    // node1.next = &node2;
+    // var n1 = LinkedNode{ .val = 1 };
+    // var n2 = LinkedNode{ .val = 2 };
+    // n1.next = &n2;
+    // n2.next = &n1;
+
+    // std.log.info("{}", .{linked_node});
+    // try tree_printer.printValueWithId(w, n1, "linked_node");
+
+    var struct1: Struct1 = .{};
     try tree_printer.printValueWithId(w, struct1, "struct1");
 }
 
 inline fn isComptime(val: anytype) bool {
     return @typeInfo(@TypeOf(.{val})).Struct.fields[0].is_comptime;
 }
+
+
+// TODO: tuple in structs
