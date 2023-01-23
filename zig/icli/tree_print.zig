@@ -131,7 +131,10 @@ pub const TreePrinter = struct {
                 // TODO: compilation issues
                 if (arg) |value| {
                     try writer.print(" \n{s}└─" ++ comptimeInColor(Color.yellow, ".?"), .{prefix.items});
+                    const backup_len = prefix.items.len;
+                    try prefix.appendSlice("  ");
                     try self.printValueImpl(prefix, counts_by_address, writer, value);
+                    prefix.shrinkRetainingCapacity(backup_len);
                 } else {
                     try writer.print(" {s} null", .{arrow});
                 }
@@ -347,7 +350,7 @@ const Struct4 = struct {};
 
 const LinkedNode = struct {
     val: i32,
-    next: *LinkedNode = undefined,
+    next: ?*LinkedNode = null,
 };
 
 const LinkedNode2 = struct {};
