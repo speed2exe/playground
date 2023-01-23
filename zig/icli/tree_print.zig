@@ -45,7 +45,7 @@ pub const TreePrinter = struct {
         counts_by_address: *CountsByAddress,
         writer: anytype,
         arg: anytype,
-    ) anyerror!void { // TODO: handle unable to infer error set
+    ) anyerror!void {
         const arg_type = @TypeOf(arg);
         try writer.print("{s}{s}", .{
             comptimeInColor(Color.bright_black, ": "),
