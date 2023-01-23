@@ -34,7 +34,8 @@ pub const TreePrinter = struct {
         var prefix = std.ArrayList(u8).init(self.allocator);
         defer prefix.deinit();
         var counts_by_address = CountsByAddress.init(self.allocator);
-        try self.printValueImpl(&prefix, &counts_by_address, writer, arg, id);
+        try writer.print(comptimeInColor(Color.yellow, id), .{});
+        try self.printValueImpl(&prefix, &counts_by_address, writer, arg);
         try writer.print("\n", .{});
     }
 
@@ -44,11 +45,9 @@ pub const TreePrinter = struct {
         counts_by_address: *CountsByAddress,
         writer: anytype,
         arg: anytype,
-        comptime id: []const u8,
     ) !void {
         const arg_type = @TypeOf(arg);
-        try writer.print("{s}{s}{s}", .{ 
-            comptimeInColor(Color.yellow, id),
+        try writer.print("{s}{s}", .{
             comptimeInColor(Color.bright_black, ": "),
             comptimeInColor(Color.cyan, @typeName(arg_type)),
         });
@@ -62,8 +61,8 @@ pub const TreePrinter = struct {
                 try self.printFieldValues(prefix, counts_by_address, writer, arg, s);
             },
             .Array => |a| {
-                if (a.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{ arg });
-                if (a.len == 0){
+                if (a.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{arg});
+                if (a.len == 0) {
                     try writer.writeAll(empty);
                     return;
                 }
@@ -71,8 +70,8 @@ pub const TreePrinter = struct {
                 try self.printArrayValues(prefix, counts_by_address, writer, arg, a);
             },
             .Vector => |v| {
-                if (v.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{ arg });
-                if (v.len == 0){
+                if (v.child == u8 and self.print_u8_chars) try writer.print(" {s}", .{arg});
+                if (v.len == 0) {
                     try writer.writeAll(empty);
                     return;
                 }
@@ -81,7 +80,7 @@ pub const TreePrinter = struct {
             },
             .Pointer => |p| {
                 switch (p.size) {
-                    .One => { 
+                    .One => {
                         const addr: usize = @ptrToInt(arg);
                         try writer.print(" " ++ address_fmt, .{addr});
 
@@ -111,14 +110,14 @@ pub const TreePrinter = struct {
                             }
                         }
 
-                        try writer.print("\n{s}└─", .{prefix.items});
+                        try writer.print("\n{s}└─" ++ comptimeInColor(Color.yellow, ".*"), .{prefix.items});
                         const backup_len = prefix.items.len;
                         try prefix.appendSlice("  ");
-                        try self.printValueImpl(prefix, counts_by_address, writer, arg.*, ".*");
+                        try self.printValueImpl(prefix, counts_by_address, writer, arg.*);
                         prefix.shrinkRetainingCapacity(backup_len);
                     },
                     .Slice => {
-                        try writer.print(" " ++ address_fmt, .{ @ptrToInt(arg.ptr) });
+                        try writer.print(" " ++ address_fmt, .{@ptrToInt(arg.ptr)});
                         if (p.child == u8 and self.print_u8_chars) try writer.print(" \"{s}\"", .{arg});
                         if (arg.len == 0) return;
                         try self.printSliceValues(prefix, counts_by_address, writer, arg);
@@ -131,10 +130,10 @@ pub const TreePrinter = struct {
             .Optional => {
                 // TODO: compilation issues
                 if (arg) |value| {
-                    try writer.print(" \n{s}└─", .{ prefix.items });
-                    try self.printValueImpl(prefix, counts_by_address, writer, value, ".?");
+                    try writer.print(" \n{s}└─" ++ comptimeInColor(Color.yellow, ".?"), .{prefix.items});
+                    try self.printValueImpl(prefix, counts_by_address, writer, value);
                 } else {
-                    try writer.print(" {s} null", .{ arrow });
+                    try writer.print(" {s} null", .{arrow});
                 }
             },
             .Union => |u| {
@@ -149,7 +148,7 @@ pub const TreePrinter = struct {
                 }
             },
             .Enum => try writer.print(" {s} {} ({d})", .{ arrow, arg, @enumToInt(arg) }),
-            .Fn => try writer.print(" " ++ address_fmt, .{ @ptrToInt(&arg) }),
+            .Fn => try writer.print(" " ++ address_fmt, .{@ptrToInt(&arg)}),
             else => try writer.print(" {s} {any}", .{ arrow, arg }),
         }
     }
@@ -168,16 +167,16 @@ pub const TreePrinter = struct {
                 try writer.print("\n{s}...{d} item(s) not shown", .{ prefix.items, arg.len - self.array_print_limit });
                 break;
             }
-            try writer.print("\n{s}├─", .{ prefix.items });
-            try prefix.appendSlice("│ ");
             const index_colored = comptime comptimeFmtInColor(Color.yellow, "[{d}]", .{i});
-            try self.printValueImpl(prefix, counts_by_address, writer, item, index_colored);
+            try writer.print("\n{s}├─" ++ index_colored, .{prefix.items});
+            try prefix.appendSlice("│ ");
+            try self.printValueImpl(prefix, counts_by_address, writer, item);
             prefix.shrinkRetainingCapacity(backup_len);
         }
-        try writer.print("\n{s}└─", .{ prefix.items });
-        try prefix.appendSlice("  ");
         const index_colored = comptime comptimeFmtInColor(Color.yellow, "[{d}]", .{arg.len - 1});
-        try self.printValueImpl(prefix, counts_by_address, writer, arg[arg_type.len - 1], index_colored);
+        try writer.print("\n{s}└─" ++ index_colored, .{prefix.items});
+        try prefix.appendSlice("  ");
+        try self.printValueImpl(prefix, counts_by_address, writer, arg[arg_type.len - 1]);
     }
 
     inline fn printVectorValues(
@@ -199,12 +198,12 @@ pub const TreePrinter = struct {
             const item = arg[i];
             try writer.print("\n{s}├─" ++ index_fmt, .{ prefix.items, i });
             try prefix.appendSlice("│ ");
-            try self.printValueImpl(prefix, counts_by_address, writer, item, "");
+            try self.printValueImpl(prefix, counts_by_address, writer, item);
             prefix.shrinkRetainingCapacity(backup_len);
         }
         try writer.print("\n{s}└─" ++ index_fmt, .{ prefix.items, i });
         try prefix.appendSlice("  ");
-        try self.printValueImpl(prefix, counts_by_address, writer, arg[arg_type.len - 1], "");
+        try self.printValueImpl(prefix, counts_by_address, writer, arg[arg_type.len - 1]);
     }
 
     inline fn printSliceValues(
@@ -223,12 +222,12 @@ pub const TreePrinter = struct {
             }
             try writer.print("\n{s}├─" ++ index_fmt, .{ prefix.items, i });
             try prefix.appendSlice("│ ");
-            try self.printValueImpl(prefix, counts_by_address, writer, item, "");
+            try self.printValueImpl(prefix, counts_by_address, writer, item);
             prefix.shrinkRetainingCapacity(backup_len);
         }
         try writer.print("\n{s}└─" ++ index_fmt, .{ prefix.items, arg.len - 1 });
         try prefix.appendSlice("  ");
-        try self.printValueImpl(prefix, counts_by_address, writer, arg[arg.len - 1], "");
+        try self.printValueImpl(prefix, counts_by_address, writer, arg[arg.len - 1]);
     }
 
     inline fn printFieldValues(
@@ -248,15 +247,15 @@ pub const TreePrinter = struct {
         const backup_len = prefix.items.len;
         const last_field_idx = arg_type.fields.len - 1;
         inline for (arg_type.fields[0..last_field_idx]) |field| {
-            try writer.print("\n{s}├─", .{prefix.items});
+            try writer.print("\n{s}├─" ++ comptimeInColor(Color.yellow, "." ++ field.name), .{prefix.items});
             try prefix.appendSlice("│ ");
-            try self.printValueImpl(prefix, counts_by_address, writer, @field(arg, field.name), "." ++ field.name);
+            try self.printValueImpl(prefix, counts_by_address, writer, @field(arg, field.name));
             prefix.shrinkRetainingCapacity(backup_len);
         }
-        try writer.print("\n{s}└─", .{prefix.items});
         const last_field_name = arg_type.fields[last_field_idx].name;
+        try writer.print("\n{s}└─" ++ comptimeInColor(Color.yellow, "." ++ last_field_name), .{prefix.items});
         try prefix.appendSlice("  ");
-        try self.printValueImpl(prefix, counts_by_address, writer, @field(arg, last_field_name), "." ++ last_field_name);
+        try self.printValueImpl(prefix, counts_by_address, writer, @field(arg, last_field_name));
         prefix.shrinkRetainingCapacity(backup_len);
     }
 
@@ -272,9 +271,9 @@ pub const TreePrinter = struct {
         const backup_len = prefix.items.len;
         inline for (arg_type.fields) |field, i| {
             if (i == idx) {
-                try writer.print("\n{s}└─", .{prefix.items});
+                try writer.print("\n{s}└─" ++ comptimeInColor(Color.yellow, "." ++ field.name), .{prefix.items});
                 try prefix.appendSlice("  ");
-                try self.printValueImpl(prefix, counts_by_address, writer, @field(arg, field.name), "." ++ field.name);
+                try self.printValueImpl(prefix, counts_by_address, writer, @field(arg, field.name));
                 prefix.shrinkRetainingCapacity(backup_len);
                 return;
             }
@@ -351,8 +350,7 @@ const LinkedNode = struct {
     next: *LinkedNode = undefined,
 };
 
-const LinkedNode2 = struct {
-};
+const LinkedNode2 = struct {};
 
 const ErrorSet1 = error{
     Error1,
@@ -400,11 +398,12 @@ pub fn main() !void {
 
     var struct1: Struct1 = .{};
     try tree_printer.printValueWithId(w, struct1, "struct1");
+
+    try tree_printer.printValueWithId(w, .{ 1, 2, 3 }, "anon");
 }
 
 inline fn isComptime(val: anytype) bool {
     return @typeInfo(@TypeOf(.{val})).Struct.fields[0].is_comptime;
 }
-
 
 // TODO: tuple in structs
