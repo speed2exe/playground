@@ -45,7 +45,7 @@ pub const TreePrinter = struct {
         counts_by_address: *CountsByAddress,
         writer: anytype,
         arg: anytype,
-    ) !void {
+    ) anyerror!void { // TODO: handle unable to infer error set
         const arg_type = @TypeOf(arg);
         try writer.print("{s}{s}", .{
             comptimeInColor(Color.bright_black, ": "),
@@ -388,13 +388,13 @@ pub fn main() !void {
     // var node1: LinkedNode = .{};
     // var node2: LinkedNode = .{.next = &node1};
     // node1.next = &node2;
-    // var n1 = LinkedNode{ .val = 1 };
-    // var n2 = LinkedNode{ .val = 2 };
-    // n1.next = &n2;
-    // n2.next = &n1;
 
     // std.log.info("{}", .{linked_node});
-    // try tree_printer.printValueWithId(w, n1, "linked_node");
+    var n1 = LinkedNode{ .val = 1 };
+    var n2 = LinkedNode{ .val = 2 };
+    n1.next = &n2;
+    n2.next = &n1;
+    try tree_printer.printValueWithId(w, n1, "n1");
 
     var struct1: Struct1 = .{};
     try tree_printer.printValueWithId(w, struct1, "struct1");
