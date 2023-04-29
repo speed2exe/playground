@@ -1,0 +1,1 @@
+[{"Breakpoint":{"BKPTOptions":{"AutoContinue":false,"ConditionText":"","EnabledState":true,"IgnoreCount":0,"OneShotState":false},"BKPTResolver":{"Options":{"Column":0,"Exact":false,"FileName":"variables.zig","Inlines":true,"LineNumber":17,"Offset":0,"SkipPrologue":true},"Type":"FileAndLine"},"Hardware":false,"SearchFilter":{"Options":{},"Type":"Unconstrained"}}}]
