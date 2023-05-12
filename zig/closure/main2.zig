@@ -20,13 +20,11 @@ pub fn call2(f: anytype, args: anytype) !void {
 }
 
 fn call(f: anytype, args: anytype) void {
-    const Closure = struct {
+    struct {
         fn execute(a: anytype) void {
             @call(.auto, f, a) catch |err| {
                 std.log.err("error: {s}", .{err});
             };
         }
-    };
-
-    @call(.auto, Closure.execute, .{args});
+    }.execute(args);
 }
