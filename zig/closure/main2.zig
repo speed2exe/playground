@@ -16,15 +16,11 @@ var pool = std.Thread.Pool{ .allocator = undefined, .threads = undefined };
 
 /// fn f(args: anytype) !void
 pub fn call2(f: anytype, args: anytype) !void {
-    try pool.spawn(call, .{ f, args });
+    try pool.spawn(execute, .{ f, args });
 }
 
-fn call(f: anytype, args: anytype) void {
-    struct {
-        fn execute(a: anytype) void {
-            @call(.auto, f, a) catch |err| {
-                std.log.err("error: {s}", .{err});
-            };
-        }
-    }.execute(args);
+fn execute(f: anytype, a: anytype) void {
+    @call(.auto, f, a) catch |err| {
+        std.log.err("error: {s}", .{err});
+    };
 }
