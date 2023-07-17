@@ -1,3 +1,4 @@
 **/zig-cache
-**/zig-out
-**/*.o
+**/*.log
+.DS_Store
+main
