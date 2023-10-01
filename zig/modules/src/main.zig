@@ -4,3 +4,7 @@ const mymod = @import("mymodule");
 pub fn main() !void {
     mymod.myfunc();
 }
+
+test "mytest" {
+    mymod.myfunc();
+}
