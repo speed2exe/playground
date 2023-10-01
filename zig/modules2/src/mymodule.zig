@@ -1,5 +1,2 @@
 const std = @import("std");
-
-pub fn myfunc() void {
-    std.debug.print("Hello, World from my module!!!\n", .{});
-}
+pub const mymodule_sub = @import("mymodule_sub.zig");

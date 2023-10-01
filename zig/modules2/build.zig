@@ -17,19 +17,17 @@ pub fn build(b: *std.Build) void {
 
     // Using named modules
     // adding modules to project (named)
-    const my_module = b.addModule("mymodule", .{
+    _ = b.addModule("mymodule", .{
         .source_file = .{ .path = "src/mymodule.zig" },
     });
 
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/test.zig" },
         .target = target,
         .optimize = optimize,
     });
-    unit_tests.addModule("mymodule", my_module);
-
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
