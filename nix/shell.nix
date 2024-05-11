@@ -9,6 +9,7 @@ pkgs.mkShell {
   buildInputs = with pkgs; [
     clang
   ];
+
   C_INCLUDE_PATH = "${pkgs.glibc.dev}/include";
 
   # packages = with pkgs; [
