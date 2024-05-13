@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> { } }:
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
@@ -7,15 +7,19 @@ pkgs.mkShell {
     glew
     mesa
     freetype
+    pkg-config
   ];
 
-  C_INCLUDE_PATH = pkgs.lib.concatStringsSep ":" [
-    "${pkgs.glibc.dev}/include"
-    "${pkgs.glfw}/include"
-    "${pkgs.glew.dev}/include"
-    "${pkgs.mesa.dev}/include"
-    "${pkgs.freetype.dev}/include"
-  ];
+  # for C project, lsp support
+  # C_INCLUDE_PATH = pkgs.lib.concatStringsSep ":" [
+  #   "${pkgs.glibc.dev}/include"
+  #   "${pkgs.glfw}/include"
+  #   "${pkgs.glew.dev}/include"
+  #   "${pkgs.libGLU.dev}/include"
+  #   "${pkgs.libGL.dev}/include"
+  #   "${pkgs.mesa.dev}/include"
+  #   "${pkgs.freetype.dev}/include"
+  # ];
 
   shellHook = ''
     echo "Environment set up for OpenGL development."
