@@ -12,8 +12,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.linkSystemLibrary("glfw3");
-    exe.addSystemIncludePath(.{ .path = "GL/glew.h" });
-    exe.addSystemIncludePath(.{ .path = "GLFW/glfw3.h" });
+    exe.linkSystemLibrary("glew");
+    exe.linkLibC();
     b.installArtifact(exe);
 
     // zig build run
