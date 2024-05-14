@@ -1,7 +1,9 @@
 const std = @import("std");
 
 const c = @cImport({
+    @cInclude("GLES/gl.h");
     @cInclude("GLFW/glfw3.h");
+    @cInclude("GL/glew.h");
 });
 
 fn glfwSetErrorCallback(code: c_int, description: [*c]const u8) callconv(.C) void {
@@ -24,10 +26,34 @@ pub fn main() !void {
     };
     c.glfwMakeContextCurrent(window);
 
-    while (c.glfwWindowShouldClose(window) == 0) {
+    std.debug.print("OpenGL version: {s}\n", .{c.glGetString(c.GL_VERSION)});
 
+    const positions: [6]c.GLfloat = .{
+        -0.5, -0.5,
+        0.0,  0.5,
+        0.5,  -0.5,
+    };
+
+    var buffer: [1]c.GLuint = undefined;
+    c.glGenBuffers(1, &buffer);
+    c.glBindBuffer(c.GL_ARRAY_BUFFER, buffer[0]);
+    c.glBufferData(c.GL_ARRAY_BUFFER, 6 * @sizeOf(c.GLfloat), &positions, c.GL_STATIC_DRAW);
+
+    // c.glVertexAttribPointer.?(0, 2, c.GL_FLOAT, c.GL_FALSE, 2 * @sizeOf(c.GLfloat), null);
+
+    c.glBindBuffer(c.GL_ARRAY_BUFFER, 0);
+
+    while (c.glfwWindowShouldClose(window) == 0) {
         // Render here
         c.glClear(c.GL_COLOR_BUFFER_BIT);
+
+        c.glDrawArrays(c.GL_TRIANGLES, 0, 3);
+
+        // c.glBegin(c.GL_TRIANGLES);
+        // c.glVertex2f(-0.5, -0.5);
+        // c.glVertex2f(0.0, 0.5);
+        // c.glVertex2f(0.5, -0.5);
+        // c.glEnd();
 
         // Swap front and back buffers
         c.glfwSwapBuffers(window);

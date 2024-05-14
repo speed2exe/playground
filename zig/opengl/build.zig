@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
     });
     exe.linkSystemLibrary("glfw3");
     exe.linkSystemLibrary("glew");
+    exe.linkSystemLibrary("libglvnd");
     exe.linkLibC();
     b.installArtifact(exe);
 
