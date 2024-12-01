@@ -1,0 +1,11 @@
+.{
+    .name = "aoc2024",
+    .version = "0.0.0",
+    .dependencies = .{
+        .subcommander = .{
+            .url = "https://github.com/speed2exe/subcommander/archive/51c27f1ec0c5ad8371f89bb6af16946c1e1da18c.tar.gz",
+            .hash = "12201cefc97283bdd97511e20b9a4cc096063da1f8181143849a7af79d32358dac0b",
+        },
+    },
+    .paths = .{ "./src/" },
+}
