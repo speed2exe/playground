@@ -44,9 +44,6 @@ pub const LineReader = struct {
     }
 
     fn nextContinue(s: *LineReader, alr_read: usize) !?[]const u8 {
-        if (alr_read == 0) {
-            unreachable;
-        }
         std.debug.assert(alr_read > 0);
 
         // assume all data left aligned
