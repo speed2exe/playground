@@ -23,7 +23,7 @@ fn day1(input: *const subcommander.InputCommand) void {
 
 fn day2(input: *const subcommander.InputCommand) void {
     _ = input;
-    log.info("day2 not done", .{});
+    aoc.day2() catch |err| logErrorExit(err);
 }
 
 fn logErrorExit(err: anyerror) void {
