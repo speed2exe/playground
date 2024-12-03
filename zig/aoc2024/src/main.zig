@@ -11,6 +11,7 @@ pub fn main() !void {
         .subcommands = &.{
             .{ .match = "day1", .execute = day1 },
             .{ .match = "day2", .execute = day2 },
+            .{ .match = "day3", .execute = day3 },
         },
     };
     try cmd.run(args[1..]);
@@ -24,6 +25,11 @@ fn day1(input: *const subcommander.InputCommand) void {
 fn day2(input: *const subcommander.InputCommand) void {
     _ = input;
     aoc.day2() catch |err| logErrorExit(err);
+}
+
+fn day3(input: *const subcommander.InputCommand) void {
+    _ = input;
+    aoc.day3() catch |err| logErrorExit(err);
 }
 
 fn logErrorExit(err: anyerror) void {

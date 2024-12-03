@@ -40,8 +40,8 @@ pub const IncPrinter = struct {
         return .{
             .ptr = p,
             .vtable = &.{
-                .print = @ptrCast(PrintFn, &@TypeOf(p.*).print),
-                .increment = @ptrCast(IncrementFn, &@TypeOf(p.*).increment),
+                .print = @ptrCast(&@TypeOf(p.*).print),
+                .increment = @ptrCast(&@TypeOf(p.*).increment),
             },
         };
     }
