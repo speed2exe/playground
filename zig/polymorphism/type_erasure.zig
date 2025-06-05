@@ -26,13 +26,10 @@ pub const FloatPrinter = struct {
 
 // abstract type
 pub const IncPrinter = struct {
-    const PrintFn = *const fn (*anyopaque) void;
-    const IncrementFn = *const fn (*anyopaque) void;
-
     ptr: *anyopaque,
     vtable: *const struct {
-        print: PrintFn,
-        increment: IncrementFn,
+        print: *const fn (*anyopaque) void,
+        increment: *const fn (*anyopaque) void,
     },
 
     // takes a pointer to a struct that implements the print and increment functions
@@ -59,14 +56,22 @@ pub fn main() !void {
     defer _ = gpa.deinit();
 
     var x: IntPrinter = .{ .value = 5 };
+    var y: IntPrinter = .{ .value = 6 };
     var z: FloatPrinter = .{ .value = 5.5 };
 
     var list = std.ArrayList(IncPrinter).init(gpa.allocator());
     defer list.deinit();
 
     try list.append(IncPrinter.init(&x));
+    try list.append(IncPrinter.init(&y));
     try list.append(IncPrinter.init(&z));
 
+    for (list.items) |item| {
+        std.debug.print("{}\n", .{item.ptr});
+
+        // observe that in x and y, the vtable is only created once
+        std.debug.print("{}\n", .{item.vtable});
+    }
     for (list.items) |item| {
         item.print();
     }
